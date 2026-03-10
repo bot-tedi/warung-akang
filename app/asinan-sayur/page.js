@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchProductsByType } from '@/lib/supabase';
 import { useCartStore } from '@/store/cartStore';
