@@ -1,11 +1,12 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 
 const ProductCard = memo(function ProductCard({ product, variant = 'default' }) {
-  const { addItem, openCart } = useCartStore();
+  const { addItem } = useCartStore();
+  const [isAdding, setIsAdding] = useState(false);
 
   // Determine color scheme based on variant
   const isAsinan = variant === 'asinan' || product.type === 'asinan_sayur';
@@ -22,7 +23,9 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
 
   const handleAddToCart = () => {
     addItem(product);
-    openCart();
+    // Visual feedback animation
+    setIsAdding(true);
+    setTimeout(() => setIsAdding(false), 300);
   };
 
   return (
@@ -63,9 +66,14 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
           
           <button
             onClick={handleAddToCart}
-            className={`text-white p-2.5 sm:p-3 rounded-xl transition-all hover:scale-105 shadow-md ${bgClass}`}
+            disabled={isAdding}
+            className={`text-white p-2.5 sm:p-3 rounded-xl transition-all hover:scale-105 shadow-md ${bgClass} ${isAdding ? 'scale-90' : ''}`}
           >
-            <Plus className="w-5 h-5" />
+            {isAdding ? (
+              <Check className="w-5 h-5 animate-bounce" />
+            ) : (
+              <Plus className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>

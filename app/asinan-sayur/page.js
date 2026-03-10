@@ -175,8 +175,14 @@ export default function AsinanSayurPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} variant="asinan" />
+            {filteredProducts.map((product, index) => (
+              <div 
+                key={product.id} 
+                className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-forwards"
+                style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
+              >
+                <ProductCard product={product} variant="asinan" />
+              </div>
             ))}
           </div>
         )}
