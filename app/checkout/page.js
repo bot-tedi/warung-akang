@@ -3,190 +3,271 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
-import { supabase } from '@/lib/supabase';
-import { 
-  ArrowLeft, 
-  Upload, 
-  CreditCard, 
-  Smartphone, 
-  User, 
-  MapPin, 
+import { useTheme } from 'next-themes';
+import {
+  ArrowLeft,
+  Upload,
+  CreditCard,
+  Smartphone,
+  User,
+  MapPin,
   Phone,
   AlertCircle,
   Check,
   X,
   FileImage,
-  Loader2
+  Loader2,
+  ShieldCheck,
+  ChevronRight,
+  Sun,
+  Moon
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// NoSSR wrapper to prevent hydration mismatch
+const NoSSR = ({ children }) => {
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => setIsClient(true), []);
+  return isClient ? children : null;
+};
+
+// --- Sub-Components for Clean Code ---
+
+const SectionHeader = ({ icon: Icon, title, subtitle }) => (
+  <div className="flex items-center gap-4 mb-8">
+    <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-100 dark:border-slate-700 shadow-sm dark:shadow-lg">
+      <Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
+    </div>
+    <div>
+      <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-900 dark:text-white">{title}</h2>
+      {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{subtitle}</p>}
+    </div>
+  </div>
+);
+
+const CustomInput = ({ label, icon: Icon, ...props }) => (
+  <div className="space-y-2">
+    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">
+      {label} {props.required && <span className="text-emerald-500 dark:text-emerald-400">*</span>}
+    </label>
+    <div className="relative group">
+      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-500 group-focus-within:text-emerald-500 dark:group-focus-within:text-emerald-400 transition-colors" />}
+      <input
+        {...props}
+        className={`w-full ${Icon ? 'pl-11' : 'px-4'} py-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500/20 dark:focus:ring-emerald-400/20 outline-none transition-all text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400 dark:placeholder:text-slate-500`}
+      />
+    </div>
+  </div>
+);
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, getTotalPrice, clearCart } = useCartStore();
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-  });
-  
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
   const [paymentFile, setPaymentFile] = useState(null);
   const [paymentPreview, setPaymentPreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Fix: Global drag-drop handlers for the document to prevent browser default behavior
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
-    const preventDefault = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    
-    window.addEventListener('dragover', preventDefault);
-    window.addEventListener('drop', preventDefault);
-    
-    return () => {
-      window.removeEventListener('dragover', preventDefault);
-      window.removeEventListener('drop', preventDefault);
-    };
-  }, []);
-  useEffect(() => {
-    if (items.length === 0) {
-      router.push('/');
-    }
+    if (items.length === 0) router.push('/');
   }, [items, router]);
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    processFile(file);
+  const copyToClipboard = async (text, button) => {
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        // Show feedback
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.classList.add('text-green-600', 'dark:text-green-400');
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.classList.remove('text-green-600', 'dark:text-green-400');
+        }, 2000);
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          document.execCommand('copy');
+          // Show feedback
+          const originalText = button.textContent;
+          button.textContent = 'Copied!';
+          button.classList.add('text-green-600', 'dark:text-green-400');
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('text-green-600', 'dark:text-green-400');
+          }, 2000);
+        } catch (err) {
+          console.error('Copy failed:', err);
+          setError('Gagal menyalin nomor. Silakan salin manual.');
+        }
+
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.error('Copy failed:', err);
+      setError('Gagal menyalin nomor. Silakan salin manual.');
+    }
   };
 
   const processFile = (file) => {
     if (!file) return;
-    
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Ukuran file maksimal 5MB');
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      setError('Hanya file gambar yang diizinkan (JPG, PNG, WEBP)');
-      return;
-    }
-    
-    setPaymentFile(file);
+    if (file.size > 5 * 1024 * 1024) return setError('File terlalu besar (Maks 5MB)');
+    if (!file.type.startsWith('image/')) return setError('Hanya format gambar yang didukung');
+
     setError('');
-    
-    // Create preview
+    setPaymentFile(file);
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPaymentPreview(reader.result);
-    };
+    reader.onloadend = () => setPaymentPreview(reader.result);
     reader.readAsDataURL(file);
-  };
-
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    
-    const file = e.dataTransfer.files[0];
-    processFile(file);
-  }, []);
-
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const clearFile = () => {
-    setPaymentFile(null);
-    setPaymentPreview(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    console.log('=== SUBMIT DEBUG ===');
+    console.log('Form data:', formData);
+    console.log('Payment file:', paymentFile);
+    console.log('Items:', items);
+    console.log('Total:', getTotalPrice());
+
+    // Validate all required fields
     if (!formData.name.trim() || !formData.phone.trim() || !formData.address.trim()) {
+      console.log('❌ Form validation failed');
       setError('Semua field wajib diisi');
       return;
     }
 
+    if (!paymentFile) {
+      console.log('❌ No payment file');
+      setError('Silakan upload bukti pembayaran terlebih dahulu');
+      return;
+    }
+
+    console.log('✅ Validation passed, starting submit...');
     setIsSubmitting(true);
     setError('');
     setUploadProgress(0);
 
     try {
-      // Validate cart items
-      if (!items || items.length === 0) {
-        throw new Error('Keranjang belanja kosong');
-      }
+      // 1. Upload payment proof to Supabase Storage
+      const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fileExt = paymentFile.name.split('.').pop();
+      const fileName = `receipts/${orderId}.${fileExt}`;
 
       setUploadProgress(30);
 
-      // 1. Prepare order items
-      const orderItems = items.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image_url: item.image_url,
-      }));
+      // Import supabase dynamically for client-side
+      const { supabase } = await import('@/lib/supabase');
+
+      const { error: uploadError } = await supabase.storage
+        .from('payment-proofs')
+        .upload(fileName, paymentFile, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: paymentFile.type,
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(`Gagal upload bukti pembayaran: ${uploadError.message}`);
+      }
 
       setUploadProgress(60);
 
-      // 2. Skip database - Order via WhatsApp only (RLS issues in Supabase)
-      console.log('Order will be sent via WhatsApp only');
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('payment-proofs')
+        .getPublicUrl(fileName);
+
+      const paymentUrl = publicUrlData.publicUrl;
+
+      setUploadProgress(80);
+
+      // 2. Save order to database (simplified)
+      const orderData = {
+        customer_name: formData.name.trim(),
+        customer_phone: formData.phone.trim(),
+        customer_address: formData.address.trim(),
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image_url: item.image_url,
+        })),
+        total_amount: getTotalPrice(),
+        payment_proof_url: paymentUrl,
+        status: 'pending_verification',
+        order_id: orderId,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data: savedOrder, error: insertError } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw new Error(`Gagal menyimpan pesanan: ${insertError.message}`);
+      }
 
       setUploadProgress(100);
 
-      // 3. Open WhatsApp with complete order message (BEFORE clearing cart)
-      const itemsList = orderItems.map(item => 
+      // 3. Clear cart BEFORE redirect
+      const totalPrice = getTotalPrice();
+      clearCart();
+
+      // 4. Open WhatsApp with order info
+      const itemsList = items.map(item =>
         `- ${item.name} (${item.quantity}x) = Rp ${(item.price * item.quantity).toLocaleString('id-ID')}`
       ).join('%0A');
-      
-      const totalPrice = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      
-      const message = `Halo Akang, ada pesanan baru!%0A%0A` +
+
+      const message = `*PESANAN BARU - WARUNG AKANG*%0A%0A` +
         `*Data Pemesan:*%0A` +
         `Nama: ${formData.name}%0A` +
         `No. WA: ${formData.phone}%0A` +
         `Alamat: ${formData.address}%0A%0A` +
         `*Pesanan:*%0A${itemsList}%0A%0A` +
         `*Total: Rp ${totalPrice.toLocaleString('id-ID')}*%0A%0A` +
-        `Mohon konfirmasi dan proses pesanan ini. Terima kasih!`;
-      
-      // 4. Clear cart AFTER message is prepared
-      clearCart();
+        `*Status: Menunggu Verifikasi Pembayaran*%0A%0A` +
+        `Order ID: ${orderId}%0A%0A` +
+        `Bukti Pembayaran: ${paymentUrl}`;
 
-      // 5. Redirect to WhatsApp
-      window.open(`https://wa.me/6285775339643?text=${message}`, '_blank');
+      // Open WhatsApp
+      window.open(
+        `https://wa.me/6285775339643?text=${message}`,
+        '_blank'
+      );
 
-      // 6. Redirect to success page
+      // 5. Redirect to success page
       router.push('/success');
-      
+
     } catch (err) {
       console.error('Checkout error details:', err);
       setError(err.message || 'Terjadi kesalahan saat memproses pesanan. Silakan coba lagi.');
@@ -196,375 +277,307 @@ export default function CheckoutPage() {
     }
   };
 
-  if (items.length === 0) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-emerald-50/30">
-      {/* Animated Header */}
-      <motion.header 
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10"
-      >
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors group"
+    <div className="min-h-screen bg-[#FDFDFD] dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300" suppressHydrationWarning>
+      {/* Theme Switcher */}
+      <div className="fixed top-24 right-6 z-40">
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-3 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-full shadow-lg dark:shadow-xl border border-slate-100 dark:border-slate-700 transition-all active:scale-95"
+            suppressHydrationWarning
           >
-            <motion.div
-              whileHover={{ x: -4 }}
-              transition={{ type: "spring", stiffness: 400 }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </motion.div>
-            <span className="font-medium">Kembali</span>
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        )}
+      </div>
+
+      {/* Premium Minimal Header */}
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800">
+        <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 group text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Return to Store</span>
           </Link>
-          <h1 className="ml-4 text-lg font-bold text-gray-800">Checkout</h1>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Secure Checkout</span>
+          </div>
         </div>
-      </motion.header>
+      </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <AnimatePresence mode="wait">
-          {/* Error Alert */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-3"
-            >
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <p className="text-sm flex-1">{error}</p>
-              <button 
-                onClick={() => setError('')}
-                className="p-1 hover:bg-red-100 rounded-full transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <main className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
+        <div className="grid lg:grid-cols-12 gap-16">
 
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {/* Customer Information */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-          >
-            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <User className="w-4 h-4 text-emerald-600" />
-              </div>
-              Informasi Pemesan
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Nama Lengkap <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
+          {/* Left Column: Form Details */}
+          <div className="lg:col-span-7 space-y-16">
+            <section>
+              <SectionHeader
+                icon={User}
+                title="Shipping Details"
+                subtitle="Pastikan informasi pengiriman sudah benar"
+              />
+              <div className="space-y-6">
+                <CustomInput
+                  label="Full Name"
                   name="name"
+                  placeholder="e.g. Jonathan Doe"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="Masukkan nama lengkap Anda"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200/50 outline-none transition-all bg-gray-50/50 focus:bg-white"
                   required
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Nomor WhatsApp <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="tel"
+                <div className="grid sm:grid-cols-2 gap-6">
+                  <CustomInput
+                    label="WhatsApp Number"
+                    icon={Phone}
                     name="phone"
+                    placeholder="0812..."
                     value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder="081234567890"
-                    pattern="[0-9]*"
-                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200/50 outline-none transition-all bg-gray-50/50 focus:bg-white"
                     required
                   />
+                  <div className="flex items-end pb-2">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Kami akan menghubungi Anda via WhatsApp untuk konfirmasi pengiriman.</p>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Alamat Pengiriman <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Delivery Address</label>
                   <textarea
                     name="address"
                     value={formData.address}
                     onChange={handleInputChange}
-                    placeholder="Masukkan alamat lengkap (RT/RW, Kelurahan, Kecamatan, Kota)"
-                    rows={3}
-                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200/50 outline-none transition-all resize-none bg-gray-50/50 focus:bg-white"
+                    placeholder="Alamat lengkap, patokan, atau instruksi khusus..."
+                    rows={4}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500/20 dark:focus:ring-emerald-400/20 outline-none transition-all text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
                     required
                   />
                 </div>
               </div>
-            </div>
-          </motion.div>
+            </section>
 
-          {/* Order Summary */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-          >
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Ringkasan Pesanan</h2>
-            
-            <div className="space-y-3 mb-4">
-              {items.map((item, index) => (
-                <motion.div 
-                  key={item.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                          <FileImage className="w-5 h-5 text-gray-400" />
-                        </div>
-                      )}
+            <section>
+              <SectionHeader
+                icon={CreditCard}
+                title="Payment Method"
+                subtitle="Pilih salah satu metode pembayaran di bawah"
+              />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="p-6 rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm dark:shadow-lg hover:border-emerald-200 dark:hover:border-emerald-700 transition-colors">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="px-3 py-1 bg-blue-600 text-[10px] font-bold text-white rounded-md">BCA</div>
+                    <button
+                      onClick={() => copyToClipboard('1234567890', event.target)}
+                      className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline uppercase tracking-widest"
+                    >
+                      Copy
+                    </button>
+                  </div>
+
+                  <p className="text-xs font-bold text-slate-900 dark:text-white mb-1">1234-5678-9012</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest">A/n Warung Akang</p>
+                </div>
+                <div className="p-6 rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm dark:shadow-lg hover:border-emerald-200 dark:hover:border-emerald-700 transition-colors">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="px-3 py-1 bg-purple-600 text-[10px] font-bold text-white rounded-md">OVO</div>
+                   <button
+                      onClick={() => copyToClipboard('085775339643', event.target)}
+                      className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline uppercase tracking-widest"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white mb-1">0857-7533-9643</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest">OVO</p>
+                </div>
+                
+              </div>
+            </section>
+
+            <section>
+              <SectionHeader
+                icon={Upload}
+                title="Upload Bukti Pembayaran"
+                subtitle="Upload bukti transfer untuk verifikasi pesanan"
+              />
+
+              {/* Upload Area */}
+              <div
+                className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all ${isDragging
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) processFile(file);
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) processFile(file);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  required
+                />
+
+                {paymentPreview ? (
+                  <div className="space-y-4">
+                    <div className="relative inline-block">
+                      <img
+                        src={paymentPreview}
+                        alt="Payment proof"
+                        className="max-w-xs max-h-48 rounded-xl shadow-lg mx-auto"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPaymentFile(null);
+                          setPaymentPreview(null);
+                        }}
+                        className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Klik atau drag untuk mengganti bukti pembayaran
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto">
+                      <FileImage className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 text-sm">{item.name}</p>
-                      <p className="text-xs text-gray-500">{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</p>
+                      <p className="text-slate-900 dark:text-white font-medium mb-2">
+                        Upload Bukti Pembayaran
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Drag & drop atau klik untuk browse
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                        Format: JPG, PNG, PDF (Max 5MB)
+                      </p>
                     </div>
                   </div>
-                  <p className="font-semibold text-gray-700 text-sm">
-                    Rp {(item.price * item.quantity).toLocaleString('id-ID')}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="border-t border-gray-100 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Total Pembayaran</span>
-                <span className="text-xl sm:text-2xl font-bold text-emerald-600">
-                  {formatPrice(getTotalPrice())}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Payment Instructions */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-          >
-            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <CreditCard className="w-4 h-4 text-emerald-600" />
-              </div>
-              Instruksi Pembayaran
-            </h2>
-
-            <div className="space-y-3">
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-xl p-4 border border-blue-100">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-500/30">
-                    BCA
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-800 block">Transfer Bank BCA</span>
-                    <span className="text-xs text-gray-500">A/n: Warung Akang</span>
-                  </div>
-                </div>
-                <div className="bg-white/70 rounded-lg p-2 font-mono text-sm text-gray-700 flex items-center justify-between">
-                  <span>1234-5678-9012</span>
-                  <button 
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText('123456789012')}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Salin
-                  </button>
-                </div>
+                )}
               </div>
 
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-xl p-4 border border-purple-100">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-purple-500/30">
-                    <Smartphone className="w-5 h-5" />
+              {/* Upload Progress */}
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-slate-600 dark:text-slate-400">Mengupload...</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">{uploadProgress}%</span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-gray-800 block">OVO / DANA</span>
-                    <span className="text-xs text-gray-500">A/n: Warung Akang</span>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
                   </div>
                 </div>
-                <div className="bg-white/70 rounded-lg p-2 font-mono text-sm text-gray-700 flex items-center justify-between">
-                  <span>0812-3456-7890</span>
-                  <button 
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText('081234567890')}
-                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
-                  >
-                    Salin
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+              )}
 
-          {/* Upload Payment Proof with Drag & Drop */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-          >
-            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <Upload className="w-4 h-4 text-emerald-600" />
-              </div>
-              Bukti Pembayaran
-            </h2>
-
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-                id="payment-proof"
-              />
-              
-              {!paymentPreview ? (
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  className={`relative w-full border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all duration-300 ${
-                    isDragging 
-                      ? 'border-emerald-500 bg-emerald-50 scale-[1.02]' 
-                      : 'border-gray-300 hover:border-emerald-400 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="flex flex-col items-center">
-                    <motion.div 
-                      animate={{ 
-                        scale: isDragging ? 1.1 : 1,
-                        y: isDragging ? -5 : 0
-                      }}
-                      className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${
-                        isDragging ? 'bg-emerald-200' : 'bg-gray-100'
-                      }`}
-                    >
-                      <Upload className={`w-7 h-7 transition-colors ${
-                        isDragging ? 'text-emerald-600' : 'text-gray-400'
-                      }`} />
-                    </motion.div>
-                    <p className="text-gray-700 font-semibold mb-1">
-                      <span className="text-emerald-600">Upload bukti pembayaran</span> (Opsional)
-                    </p>
-                    <p className="text-gray-500 text-sm">Preview hanya untuk verifikasi</p>
-                    <p className="text-gray-400 text-xs mt-2">JPG, PNG, WEBP • Max 5MB</p>
-                    <p className="text-emerald-600 text-xs mt-1 font-medium">✓ Bisa juga kirim via WhatsApp nanti</p>
+              {/* Error Display */}
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                    <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
                   </div>
                 </div>
-              ) : (
-                <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500">
-                  <img 
-                    src={paymentPreview} 
-                    alt="Payment proof preview" 
-                    className="w-full max-h-64 object-contain bg-gray-100"
-                  />
+              )}
+            </section>
+          </div>
+
+          {/* Right Column: Sticky Summary */}
+          <div className="lg:col-span-5">
+            <div className="sticky top-32 space-y-8">
+              <NoSSR>
+                <div className="bg-slate-900 dark:bg-slate-800 rounded-[2rem] p-8 text-white shadow-2xl shadow-slate-200 dark:shadow-slate-900">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.3em] text-blue-400 dark:text-blue-400 mb-8">Order Summary</h3>
+
+                  <div className="space-y-6 mb-10 max-h-[300px] overflow-y-auto no-scrollbar">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex justify-between items-start group">
+                        <div className="flex gap-4">
+                          <div className="w-12 h-12 bg-white/5 dark:bg-white/10 rounded-xl overflow-hidden flex-shrink-0">
+                            <img src={item.image_url} alt={item.name} className="w-full h-full object-cover opacity-80" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-100 dark:text-slate-100">{item.name}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">{item.quantity} Unit</p>
+                          </div>
+                        </div>
+                        <p className="text-sm font-medium">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4 pt-8 border-t border-white/10 dark:border-slate-700">
+                    <div className="flex justify-between items-center text-slate-400 dark:text-slate-400">
+                      <span className="text-[10px] uppercase tracking-widest">Subtotal</span>
+                      <span className="text-sm">Rp {getTotalPrice().toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-400 dark:text-slate-400">
+                      <span className="text-[10px] uppercase tracking-widest">Delivery Fee</span>
+                      <span className="text-sm">FREE</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-100 dark:text-slate-100">Total Amount</span>
+                      <span className="text-2xl font-light text-blue-400 dark:text-blue-400">Rp {getTotalPrice().toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={clearFile}
-                    className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || !paymentFile}
+                    className="w-full mt-10 py-5 bg-blue-500 hover:bg-blue-500 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white font-bold text-[10px] uppercase tracking-[0.3em] rounded-2xl transition-all flex items-center justify-center gap-3 disabled:cursor-not-allowed"
                   >
-                    <X className="w-4 h-4" />
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {uploadProgress > 0 ? `Uploading... ${uploadProgress}%` : 'Processing...'}
+                      </>
+                    ) : (
+                      <>Upload & Complete Order <ChevronRight className="w-4 h-4" /></>
+                    )}
                   </button>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-3">
-                    <p className="text-white text-sm font-medium flex items-center gap-2">
-                      <Check className="w-4 h-4" />
-                      {paymentFile.name}
-                    </p>
-                  </div>
+
+                  <p className="text-center text-[9px] text-slate-500 dark:text-slate-400 mt-6 uppercase tracking-widest leading-loose">
+                    Pesanan akan diverifikasi setelah bukti pembayaran diupload. <br />
+                    Admin akan menghubungi Anda setelah verifikasi selesai.
+                  </p>
                 </div>
-              )}
+              </NoSSR>
+
+              {/* Secure Info Card */}
+              <div className="p-6 rounded-2xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex gap-4">
+                <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <p className="text-[10px] text-blue-700 dark:text-blue-300 leading-relaxed font-medium uppercase tracking-wider">
+                  Data Anda aman. Kami hanya menggunakan informasi ini untuk keperluan koordinasi pengiriman pesanan.
+                </p>
+              </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Submit Button with Progress */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full relative bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-500/30 disabled:shadow-none overflow-hidden"
-            >
-              {isSubmitting ? (
-                <div className="flex items-center justify-center gap-3">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Memproses... {uploadProgress > 0 && `${uploadProgress}%`}</span>
-                </div>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <Check className="w-5 h-5" />
-                  Konfirmasi Pesanan
-                </span>
-              )}
-              
-              {/* Progress bar */}
-              {isSubmitting && uploadProgress > 0 && (
-                <motion.div 
-                  className="absolute bottom-0 left-0 h-1 bg-white/50"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${uploadProgress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              )}
-            </button>
-          </motion.div>
-        </form>
-
-        {/* Footer Note */}
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="text-center text-gray-400 text-xs mt-6"
-        >
-          Dengan melakukan pemesanan, Anda menyetujui syarat dan ketentuan kami
-        </motion.p>
+        </div>
       </main>
+
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 }

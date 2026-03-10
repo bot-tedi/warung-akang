@@ -8,11 +8,8 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
   const { addItem } = useCartStore();
   const [isAdding, setIsAdding] = useState(false);
 
-  // Determine color scheme based on variant
   const isAsinan = variant === 'asinan' || product.type === 'asinan_sayur';
-  const colorClass = isAsinan ? 'text-orange-600' : 'text-emerald-600';
-  const bgClass = isAsinan ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30';
-  const badgeClass = isAsinan ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600';
+  const themeColor = isAsinan ? 'emerald' : 'emerald'; // Konsisten profesional
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('id-ID', {
@@ -24,67 +21,62 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
 
   const handleAddToCart = () => {
     addItem(product);
-    // Visual feedback animation
     setIsAdding(true);
-    setTimeout(() => setIsAdding(false), 300);
+    setTimeout(() => setIsAdding(false), 800);
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 hover:-translate-y-1">
-      {/* Product Image - Professional */}
-      <div className="relative aspect-square bg-gray-100 overflow-hidden">
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-200">
-            <span className="text-gray-400 text-sm font-medium">No Image</span>
-          </div>
-        )}
-        
-        {/* Overlay on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        
-        {/* Category Badge */}
-        <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeClass} backdrop-blur-sm`}>
-          {isAsinan ? 'Asinan' : 'Sayur'}
+    <div className="group bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 overflow-hidden transition-all duration-700 hover:shadow-2xl hover:shadow-slate-200/50 dark:hover:shadow-slate-900/50 hover:-translate-y-2">
+      {/* Image Container */}
+      <div className="relative aspect-square overflow-hidden bg-slate-50 dark:bg-slate-700">
+        <img
+          src={product.image_url || '/placeholder.png'}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 dark:from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+        {/* Category Tag */}
+        <div className="absolute top-5 left-5">
+          <span className="px-4 py-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white shadow-sm dark:shadow-lg">
+            {isAsinan ? 'Signature' : 'Fresh Market'}
+          </span>
         </div>
       </div>
 
-      {/* Product Info - Professional */}
-      <div className="p-4 sm:p-5">
-        <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-1.5 line-clamp-1 group-hover:text-gray-700 transition-colors">
-          {product.name}
-        </h3>
-        
-        {product.description && (
-          <p className="text-gray-500 text-sm mb-3 line-clamp-2 leading-relaxed">
-            {product.description}
-          </p>
-        )}
+      {/* Content */}
+      <div className="p-8">
+        <div className="mb-6">
+          <h3 className="text-xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-serif italic">
+            {product.name}
+          </h3>
+          {product.description && (
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-light line-clamp-2 leading-relaxed">
+              {product.description}
+            </p>
+          )}
+        </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-          <div>
-            <span className={`font-bold text-lg sm:text-xl ${colorClass}`}>
+        <div className="flex items-center justify-between pt-6 border-t border-slate-50 dark:border-slate-700">
+          <div className="flex flex-col">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-500">Price / Unit</span>
+            <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               {formatPrice(product.price)}
             </span>
-            <span className="text-gray-400 text-xs block">/item</span>
           </div>
-          
+
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className={`text-white p-3 rounded-xl transition-all duration-200 hover:scale-105 shadow-lg ${bgClass} ${isAdding ? 'scale-95' : ''}`}
+            className={`relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg ${isAdding
+                ? 'bg-emerald-500 shadow-emerald-200 dark:shadow-emerald-600/30'
+                : 'bg-slate-900 dark:bg-emerald-600 hover:bg-emerald-600 dark:hover:bg-emerald-700 shadow-slate-200 dark:shadow-emerald-600/20'
+              }`}
           >
             {isAdding ? (
-              <Check className="w-5 h-5" />
+              <Check className="w-5 h-5 text-white" />
             ) : (
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 text-white" />
             )}
           </button>
         </div>

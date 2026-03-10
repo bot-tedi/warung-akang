@@ -2,21 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom animations */
-@keyframes slide-in-right {
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 252, 252, 252;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@layer base {
+  body {
+    color: rgb(var(--foreground-rgb));
+    background: linear-gradient(to bottom,
+        rgb(var(--background-start-rgb)),
+        rgb(var(--background-end-rgb)));
+    @apply antialiased;
+  }
+
+  /* Professional Typography - Tracking & Kerning */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply tracking-tight;
+  }
+
+  p {
+    @apply leading-relaxed;
+  }
+}
+
+@layer components {
+
+  /* Glassmorphism Professional */
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-sm;
+  }
+
+  /* Smooth Button Transitions */
+  .btn-premium {
+    @apply transition-all duration-500 ease-out active:scale-95 hover:shadow-2xl hover:shadow-emerald-500/10;
+  }
+}
+
+/* Custom Animations - Professional Class */
+@keyframes fade-in-up {
   from {
-    transform: translateX(100%);
+    opacity: 0;
+    transform: translateY(20px);
   }
+
   to {
-    transform: translateX(0);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease-out;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
-/* Line clamp utilities */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bounce-slow {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Animation Utilities */
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 1.2s ease-out forwards;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 5s ease-in-out infinite;
+}
+
+/* Custom Scrollbar - Minimalist Style */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full transition-colors;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}
+
+/* Line clamp utilities - Tetap dipertahankan */
 .line-clamp-1 {
   display: -webkit-box;
   -webkit-line-clamp: 1;
@@ -31,21 +138,15 @@
   overflow: hidden;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }

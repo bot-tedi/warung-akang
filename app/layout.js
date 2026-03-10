@@ -1,3 +1,4 @@
+import { ThemeProvider } from 'next-themes'
 import './globals.css';
 
 export const metadata = {
@@ -7,8 +8,12 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id">
-      <body className="antialiased">{children}</body>
+    <html lang="id" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

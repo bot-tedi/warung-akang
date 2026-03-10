@@ -1,35 +1,54 @@
 'use client';
 
-import { CheckCircle, Home, MessageCircle } from 'lucide-react';
+import { CheckCircle, Home, MessageCircle, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
+import { useState, useEffect } from 'react';
 
 export default function SuccessPage() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 dark:from-slate-900 to-white dark:to-slate-800 flex items-center justify-center p-4 transition-colors duration-300">
+      {/* Theme Switcher */}
+      <div className="fixed top-6 right-6 z-40">
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-3 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-full shadow-lg dark:shadow-xl border border-slate-100 dark:border-slate-700 transition-all active:scale-95"
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        )}
+      </div>
+
+      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl shadow-xl dark:shadow-2xl p-8 text-center border border-slate-100 dark:border-slate-700">
         {/* Success Icon */}
-        <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle className="w-12 h-12 text-emerald-500" />
+        <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-12 h-12 text-emerald-500 dark:text-emerald-400" />
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-800 mb-3">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">
           Pesanan Berhasil!
         </h1>
 
         {/* Message */}
-        <p className="text-gray-600 mb-8">
-          Terima kasih telah memesan di Warung Akang. Pesanan Anda telah kami terima dan sedang diproses. 
+        <p className="text-gray-600 dark:text-slate-400 mb-8">
+          Terima kasih telah memesan di Warung Akang. Pesanan Anda telah kami terima dan sedang diproses.
           Admin akan segera menghubungi Anda melalui WhatsApp untuk konfirmasi.
         </p>
 
         {/* WhatsApp Info */}
-        <div className="bg-emerald-50 rounded-xl p-4 mb-8 border border-emerald-100">
-          <div className="flex items-center gap-2 justify-center text-emerald-700">
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 mb-8 border border-emerald-100 dark:border-emerald-800">
+          <div className="flex items-center gap-2 justify-center text-emerald-700 dark:text-emerald-400">
             <MessageCircle className="w-5 h-5" />
             <span className="font-medium">Cek WhatsApp Anda</span>
           </div>
-          <p className="text-sm text-emerald-600 mt-1">
+          <p className="text-sm text-emerald-600 dark:text-emerald-500 mt-1">
             Detail pesanan telah dikirim ke WhatsApp Admin
           </p>
         </div>
@@ -37,14 +56,14 @@ export default function SuccessPage() {
         {/* Back to Home Button */}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-8 py-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-emerald-500/30"
+          className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white font-semibold px-8 py-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-emerald-500/30 dark:shadow-emerald-600/20"
         >
           <Home className="w-5 h-5" />
           <span>Kembali ke Beranda</span>
         </Link>
 
         {/* Footer Note */}
-        <p className="text-gray-400 text-sm mt-6">
+        <p className="text-gray-400 dark:text-slate-500 text-sm mt-6">
           Warung Akang - Hidangan Segar untuk Keluarga Anda
         </p>
       </div>
