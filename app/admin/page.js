@@ -233,26 +233,28 @@ export default function AdminPage() {
 
     setIsUploading(true);
     try {
+      // 1. Buat nama file unik
       const fileExt = imageFile.name.split('.').pop();
-      const fileName = `products/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      // 2. Upload langsung ke Supabase Storage
+      // Pastikan Anda sudah membuat bucket bernama 'product-images' di Dashboard Supabase
+      const { data, error } = await supabase.storage
         .from('product-images')
-        .upload(fileName, imageFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+        .upload(filePath, imageFile);
 
-      if (uploadError) throw uploadError;
+      if (error) throw error;
 
-      const { data: publicUrlData } = supabase.storage
+      // 3. Ambil Public URL
+      const { data: { publicUrl } } = supabase.storage
         .from('product-images')
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
 
-      return publicUrlData.publicUrl;
+      return publicUrl;
     } catch (err) {
       console.error('Upload error:', err);
-      alert('Failed to upload image: ' + err.message);
+      alert('Gagal upload ke Supabase Storage: ' + err.message);
       return null;
     } finally {
       setIsUploading(false);
@@ -265,14 +267,20 @@ export default function AdminPage() {
       return;
     }
 
+    setLoading(true);
     try {
       let imageUrl = formData.image_url;
 
+      // 1. Upload gambar jika ada file baru yang dipilih
       if (imageFile) {
         imageUrl = await uploadImage();
-        if (!imageUrl) return;
+        if (!imageUrl) {
+          setLoading(false);
+          return;
+        }
       }
 
+      // 2. Siapkan data produk
       const productData = {
         name: formData.name,
         price: parseCurrencyValue(formData.price),
@@ -283,22 +291,38 @@ export default function AdminPage() {
         stock: parseInt(formData.stock) || 0,
       };
 
+      // 3. Simpan langsung ke tabel 'products' menggunakan Supabase Client
+      let result;
       if (editingProduct) {
-        await supabase.from('products').update(productData).eq('id', editingProduct.id);
+        // Update produk yang sudah ada
+        result = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingProduct.id);
       } else {
-        await supabase.from('products').insert([productData]);
+        // Tambah produk baru
+        result = await supabase
+          .from('products')
+          .insert([productData]);
       }
 
-      // Reset form
+      if (result.error) throw result.error;
+
+      // 4. Reset form dan tutup modal
+      alert('Produk berhasil disimpan!');
       setFormData({ name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0 });
       setImageFile(null);
       setImagePreview(null);
       setIsModalOpen(false);
       setEditingProduct(null);
+      
+      // Refresh data di halaman admin
       fetchInitialData();
     } catch (err) {
       console.error('Save error:', err);
       alert('Failed to save product: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -466,8 +490,26 @@ export default function AdminPage() {
 
   const handleDeleteProduct = async (id) => {
     if (confirm('Hapus produk ini secara permanen?')) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (!error) fetchInitialData();
+      setLoading(true);
+      try {
+        // Hapus langsung dari tabel 'products' menggunakan Supabase Client
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        alert('Produk berhasil dihapus!');
+        
+        // Refresh data agar daftar produk diperbarui
+        await fetchInitialData();
+      } catch (err) {
+        console.error('Delete error:', err);
+        alert('Gagal menghapus produk: ' + err.message);
+      } finally {
+        setLoading(true);
+      }
     }
   };
 
