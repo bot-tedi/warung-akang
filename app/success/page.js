@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Home, MessageCircle, Sun, Moon } from 'lucide-react';
+import { CheckCircle, Home, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
@@ -8,8 +8,13 @@ import { useState, useEffect } from 'react';
 export default function SuccessPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [orderSummary, setOrderSummary] = useState('');
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    const summary = localStorage.getItem('latest_order_summary');
+    setOrderSummary(summary || 'Detail pesanan tidak ditemukan.');
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 dark:from-slate-900 to-white dark:to-slate-800 flex items-center justify-center p-4 transition-colors duration-300">
@@ -38,19 +43,14 @@ export default function SuccessPage() {
 
         {/* Message */}
         <p className="text-gray-600 dark:text-slate-400 mb-8">
-          Terima kasih telah memesan di Warung Akang. Pesanan Anda telah kami terima dan sedang diproses.
-          Admin akan segera menghubungi Anda melalui WhatsApp untuk konfirmasi.
+          Terima kasih telah memesan di Warung Akang. Pesanan Anda telah kami terima dan disimpan di sistem admin.
+          Silakan tunggu konfirmasi selanjutnya (verifikasi pembayaran dan pengiriman).
         </p>
 
-        {/* WhatsApp Info */}
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 mb-8 border border-emerald-100 dark:border-emerald-800">
-          <div className="flex items-center gap-2 justify-center text-emerald-700 dark:text-emerald-400">
-            <MessageCircle className="w-5 h-5" />
-            <span className="font-medium">Cek WhatsApp Anda</span>
-          </div>
-          <p className="text-sm text-emerald-600 dark:text-emerald-500 mt-1">
-            Detail pesanan telah dikirim ke WhatsApp Admin
-          </p>
+        {/* Structured Order Summary */}
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-4 mb-8 border border-slate-200 dark:border-slate-700 text-left">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Ringkasan Pesanan</h3>
+          <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-slate-700 dark:text-slate-300">{orderSummary}</pre>
         </div>
 
         {/* Back to Home Button */}

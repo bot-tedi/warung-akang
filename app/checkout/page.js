@@ -156,9 +156,9 @@ export default function CheckoutPage() {
     console.log('Total:', getTotalPrice());
 
     // Validate all required fields
-    if (!formData.name.trim() || !formData.phone.trim() || !formData.address.trim()) {
+    if (!formData.name.trim() || !formData.address.trim()) {
       console.log('❌ Form validation failed');
-      setError('Semua field wajib diisi');
+      setError('Nama dan alamat wajib diisi');
       return;
     }
 
@@ -233,7 +233,7 @@ export default function CheckoutPage() {
       // 2. Save order to database (simplified)
       const orderData = {
         customer_name: formData.name.trim(),
-        customer_phone: formData.phone.trim(),
+        customer_phone: formData.phone.trim() || 'Tidak disediakan',
         customer_address: formData.address.trim(),
         items: items.map(item => ({
           id: item.id,
@@ -245,6 +245,7 @@ export default function CheckoutPage() {
         total_amount: getTotalPrice(),
         payment_proof_url: paymentUrl,
         status: 'pending_verification',
+        order_id: orderId,
       };
 
       const { data: savedOrder, error: insertError } = await supabase
@@ -289,27 +290,24 @@ export default function CheckoutPage() {
       const totalPrice = getTotalPrice();
       clearCart();
 
-      // 4. Open WhatsApp with order info
-      const itemsList = items.map(item =>
+      // 4. Store formatted order summary for success page and admin reference
+      const itemsListText = items.map(item =>
         `- ${item.name} (${item.quantity}x) = Rp ${(item.price * item.quantity).toLocaleString('id-ID')}`
-      ).join('%0A');
+      ).join('\n');
 
-      const message = `*PESANAN BARU - WARUNG AKANG*%0A%0A` +
-        `*Data Pemesan:*%0A` +
-        `Nama: ${formData.name}%0A` +
-        `No. WA: ${formData.phone}%0A` +
-        `Alamat: ${formData.address}%0A%0A` +
-        `*Pesanan:*%0A${itemsList}%0A%0A` +
-        `*Total: Rp ${totalPrice.toLocaleString('id-ID')}*%0A%0A` +
-        `*Status: Menunggu Verifikasi Pembayaran*%0A%0A` +
-        `Order ID: ${orderId}%0A%0A` +
+      const threadedSummary = `PESANAN BARU - WARUNG AKANG\n\n` +
+        `Data Pemesan:\n` +
+        `Nama: ${formData.name}\n` +
+        `No. WA: ${formData.phone || 'Tidak disediakan'}\n` +
+        `Alamat: ${formData.address}\n\n` +
+        `Pesanan:\n${itemsListText}\n\n` +
+        `Total: Rp ${totalPrice.toLocaleString('id-ID')}\n\n` +
+        `Status: Menunggu Verifikasi Pembayaran\n\n` +
+        `Order ID: ${orderId}\n\n` +
         `Bukti Pembayaran: ${paymentUrl}`;
 
-      // Open WhatsApp
-      window.open(
-        `https://wa.me/6285775339643?text=${message}`,
-        '_blank'
-      );
+      localStorage.setItem('latest_order_summary', threadedSummary);
+      localStorage.setItem('latest_order_id', orderId);
 
       // Setup anti-spam cooldown for next order
       localStorage.setItem('last_warung_order_time', Date.now().toString());
@@ -377,16 +375,16 @@ export default function CheckoutPage() {
                 />
                 <div className="grid sm:grid-cols-2 gap-6">
                   <CustomInput
-                    label="WhatsApp Number"
+                    label="Nomor Telepon"
                     icon={Phone}
                     name="phone"
                     placeholder="0812..."
                     value={formData.phone}
                     onChange={handleInputChange}
-                    required
+                    required={false}
                   />
                   <div className="flex items-end pb-2">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Kami akan menghubungi Anda via WhatsApp untuk konfirmasi pengiriman.</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Opsional, untuk admin menghubungi jika diperlukan.</p>
                   </div>
                 </div>
                 <div className="space-y-2">
