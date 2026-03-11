@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { useTheme } from 'next-themes';
-import { decreaseStock, checkProductAvailability } from '@/lib/supabase';
+import { supabase, decreaseStock, checkProductAvailability } from '@/lib/supabase';
 import {
   ArrowLeft,
   Upload,
@@ -206,9 +206,6 @@ export default function CheckoutPage() {
 
       setUploadProgress(30);
 
-      // Import supabase dynamically for client-side
-      const { supabase } = await import('@/lib/supabase');
-
       const { error: uploadError } = await supabase.storage
         .from('payment-proofs')
         .upload(fileName, paymentFile, {
@@ -249,9 +246,6 @@ export default function CheckoutPage() {
         payment_proof_url: paymentUrl,
         status: 'pending_verification',
       };
-
-      // Import supabase dynamically for client-side
-      const { supabase } = await import('@/lib/supabase');
 
       const { data: savedOrder, error: insertError } = await supabase
         .from('orders')
