@@ -289,8 +289,28 @@ export default function CheckoutPage() {
       const totalPrice = getTotalPrice();
       clearCart();
 
-      // 4. Do not open WhatsApp automatically; this app uses in-app notification only.
-      // (If WA message needed in future, implement proper server-side WA API integration.)
+      // 4. Open WhatsApp with order info
+      const itemsList = items.map(item =>
+        `- ${item.name} (${item.quantity}x) = Rp ${(item.price * item.quantity).toLocaleString('id-ID')}`
+      ).join('%0A');
+
+      const message = `*PESANAN BARU - WARUNG AKANG*%0A%0A` +
+        `*Data Pemesan:*%0A` +
+        `Nama: ${formData.name}%0A` +
+        `No. WA: ${formData.phone}%0A` +
+        `Alamat: ${formData.address}%0A%0A` +
+        `*Pesanan:*%0A${itemsList}%0A%0A` +
+        `*Total: Rp ${totalPrice.toLocaleString('id-ID')}*%0A%0A` +
+        `*Status: Menunggu Verifikasi Pembayaran*%0A%0A` +
+        `Order ID: ${orderId}%0A%0A` +
+        `Bukti Pembayaran: ${paymentUrl}`;
+
+      // Open WhatsApp
+      window.open(
+        `https://wa.me/6285775339643?text=${message}`,
+        '_blank'
+      );
+
       // Setup anti-spam cooldown for next order
       localStorage.setItem('last_warung_order_time', Date.now().toString());
 
