@@ -48,6 +48,7 @@ export default function AdminPage() {
   // Form State (Tetap sesuai sistem Anda)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [formData, setFormData] = useState({
     name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0
   });
@@ -739,6 +740,9 @@ export default function AdminPage() {
                       <td className="px-8 py-6 font-bold text-sm">Rp {order.total_amount?.toLocaleString()}</td>
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-2">
+                          <button onClick={() => setSelectedOrder(order)} className="px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-all text-xs font-bold">
+                            Detail
+                          </button>
                           <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><CheckCircle className="w-4 h-4" /></button>
                           <button onClick={() => handleUpdateStatus(order.id, 'cancelled')} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><XCircle className="w-4 h-4" /></button>
                         </div>
@@ -926,6 +930,82 @@ export default function AdminPage() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+      {/* --- MODAL DETAIL PESANAN (REVOLUSI) --- */}
+      {selectedOrder && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl"
+          >
+            {/* Header Visual */}
+            <div className="bg-slate-900 p-8 text-white flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 mb-2">Pesanan Baru - Warung Akang</p>
+                <h2 className="text-2xl font-bold tracking-tighter italic">Order Detail</h2>
+              </div>
+              <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-white transition-colors">
+                <XCircle className="w-8 h-8" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6 max-h-[65vh] overflow-y-auto no-scrollbar">
+              {/* DATA PEMESAN */}
+              <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-4">Data Pemesan</h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="text-slate-400">Nama:</span> <span className="font-bold">{selectedOrder.customer_name}</span></p>
+                  <p><span className="text-slate-400">No. WA:</span> <span className="font-bold">{selectedOrder.customer_phone}</span></p>
+                  <p><span className="text-slate-400">Alamat:</span> <span className="font-medium text-slate-600 italic">"{selectedOrder.address || 'Alamat tidak diisi'}"</span></p>
+                </div>
+              </div>
+
+              {/* DAFTAR PESANAN */}
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Item Pesanan</h3>
+                <div className="space-y-3">
+                  {selectedOrder.items?.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center border-b border-slate-50 pb-3">
+                      <span className="text-sm font-bold text-slate-800">- {item.name} ({item.quantity}x)</span>
+                      <span className="text-sm font-mono text-emerald-600 font-black">Rp {item.price?.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 flex justify-between items-center bg-emerald-50 p-4 rounded-2xl">
+                  <span className="font-black text-xs uppercase tracking-widest text-emerald-700">Total Tagihan</span>
+                  <span className="text-xl font-black text-slate-900">Rp {selectedOrder.total_amount?.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* BUKTI PEMBAYARAN */}
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Bukti Verifikasi</h3>
+                <div className="rounded-3xl overflow-hidden border-2 border-slate-100 shadow-sm relative group">
+                  <img
+                    src={selectedOrder.payment_proof_url}
+                    className="w-full h-auto max-h-80 object-contain bg-slate-100"
+                    alt="Bukti Transfer"
+                  />
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
+                    Status: {selectedOrder.status}
+                  </div>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-3 font-mono break-all">{selectedOrder.payment_proof_url}</p>
+              </div>
+            </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
+              <button
+                onClick={() => { handleUpdateStatus(selectedOrder.id, 'completed'); setSelectedOrder(null); }}
+                className="flex-grow py-5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] hover:bg-emerald-700 transition-colors"
+              >
+                Tandai Selesai
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
