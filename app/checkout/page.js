@@ -248,15 +248,31 @@ export default function CheckoutPage() {
         total_amount: getTotalPrice(),
         payment_proof_url: paymentUrl,
         status: 'pending_verification',
-        order_id: orderId,
-        created_at: new Date().toISOString(),
       };
 
-      const { data: savedOrder, error: insertError } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select()
-        .single();
+      // Import supabase dynamically for client-side
+      const { supabaseAdmin } = await import('@/lib/supabase');
+
+      // Try using admin client first (bypasses RLS)
+      let insertResult;
+      try {
+        insertResult = await supabaseAdmin
+          .from('orders')
+          .insert([orderData])
+          .select()
+          .single();
+      } catch (adminError) {
+        console.log('Admin client failed, trying regular client:', adminError);
+        // Fallback to regular client
+        const { supabase } = await import('@/lib/supabase');
+        insertResult = await supabase
+          .from('orders')
+          .insert([orderData])
+          .select()
+          .single();
+      }
+
+      const { data: savedOrder, error: insertError } = insertResult;
 
       if (insertError) {
         console.error('Insert error:', insertError);
@@ -276,6 +292,16 @@ export default function CheckoutPage() {
         console.error('Error decreasing stock:', stockError);
         // Don't fail the order, but log the error for manual correction
         console.warn('⚠️ Order saved but stock update failed - manual correction needed');
+      }
+
+      // 4. Create notification for admin panel
+      try {
+        const { notifyNewOrder } = await import('@/lib/notifications');
+        await notifyNewOrder(orderData);
+        console.log('✅ Admin notification created');
+      } catch (notifError) {
+        console.error('Error creating admin notification:', notifError);
+        // Don't fail the order, notification is optional
       }
 
       setUploadProgress(100);

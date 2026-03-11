@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MonthlyRevenueChart from '@/components/MonthlyRevenueChart';
+import NotificationCenter from '@/components/NotificationCenter';
 
 // --- Auth & Config (Tetap sesuai sistem Anda) ---
 const ADMIN_PASSWORD_HASH = 'W4rung@k4ng2024!S3cur3';
@@ -317,7 +318,7 @@ export default function AdminPage() {
   // --- Data Reset (Security & Maintenance) ---
   const handleResetAllData = async () => {
     const confirmPrompt = window.prompt("PERINGATAN BAHAYA!\n\nTindakan ini akan MENGHAPUS SEMUA DATA TRANSAKSI (Orders) dan PENDAPATAN BULANAN (Monthly Revenue) secara permanen.\n\nKetik 'RESET SAYA YAKIN' untuk melanjutkan:");
-    
+
     if (confirmPrompt !== "RESET SAYA YAKIN") {
       alert("Reset dibatalkan.");
       return;
@@ -334,7 +335,7 @@ export default function AdminPage() {
       if (orderError) throw orderError;
 
       alert('Berhasil mereset seluruh data transaksi dan pendapatan!');
-      
+
       // Reset stats in UI immediately
       setRealTimeStats({
         totalRevenue: 0, pendingOrders: 0, completedOrders: 0,
@@ -493,7 +494,7 @@ export default function AdminPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <button 
+            <button
               type="submit"
               disabled={loading}
               className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all disabled:bg-slate-400"
@@ -575,6 +576,7 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
+            <NotificationCenter />
             <div className="relative group">
               <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 lg:w-4 lg:h-4 text-slate-400" />
               <input
@@ -622,8 +624,8 @@ export default function AdminPage() {
               <div className="p-8 border-b border-slate-50 flex items-center justify-between">
                 <h2 className="font-bold uppercase tracking-widest text-xs flex items-center gap-2">
                   Recent Transactions
-                  <button 
-                    onClick={handleResetAllData} 
+                  <button
+                    onClick={handleResetAllData}
                     className="ml-4 px-3 py-1 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-600 hover:text-white transition-all flex items-center gap-1"
                     title="Hapus Semua Data Transaksi & Pendapatan"
                   >
