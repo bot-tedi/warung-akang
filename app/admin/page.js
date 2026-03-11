@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MonthlyRevenueChart from '@/components/MonthlyRevenueChart';
-import NotificationCenter from '@/components/NotificationCenter';
 
 // --- Auth & Config (Tetap sesuai sistem Anda) ---
 const ADMIN_PASSWORD_HASH = 'W4rung@k4ng2024!S3cur3';
@@ -275,7 +274,7 @@ export default function AdminPage() {
 
       const productData = {
         name: formData.name,
-        price: parseInt(formData.price),
+        price: parseCurrencyValue(formData.price),
         type: formData.type,
         category: formData.category,
         description: formData.description,
@@ -300,6 +299,18 @@ export default function AdminPage() {
       console.error('Save error:', err);
       alert('Failed to save product: ' + err.message);
     }
+  };
+
+  const formatCurrencyInput = (value) => {
+    const digits = value.replace(/[^0-9]/g, '');
+    if (!digits) return '';
+    return Number(digits).toLocaleString('id-ID');
+  };
+
+  const parseCurrencyValue = (formattedValue) => {
+    const digits = formattedValue.replace(/[^0-9]/g, '');
+    const number = parseInt(digits, 10);
+    return Number.isNaN(number) ? 0 : number;
   };
 
   // --- Logic Dashboard (Logic tetap, hanya format visual diperhalus) ---
@@ -576,7 +587,6 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
-            <NotificationCenter />
             <div className="relative group">
               <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 lg:w-4 lg:h-4 text-slate-400" />
               <input
@@ -811,11 +821,13 @@ export default function AdminPage() {
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Price (IDR)</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, price: formatCurrencyInput(e.target.value) })}
                     className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    placeholder="15000"
+                    placeholder="20.000"
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
