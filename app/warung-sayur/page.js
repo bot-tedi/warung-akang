@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchProducts, fetchProductsByTypeAndCategory } from '@/lib/supabase';
+import { fuzzyMatch } from '@/lib/utils';
 import { useCartStore } from '@/store/cartStore';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
@@ -50,10 +51,13 @@ export default function WarungSayurPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { items, getTotalItems } = useCartStore();
   
+  const [mounted, setMounted] = useState(false);
+
   // Calculate total items directly for reactivity
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
+    setMounted(true);
     async function loadProducts() {
       try {
         setLoading(true);
@@ -76,7 +80,7 @@ export default function WarungSayurPage() {
   }, [activeCategory]);
 
   const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    fuzzyMatch(product.name, searchQuery) || fuzzyMatch(product.category, searchQuery)
   );
 
   return (
@@ -183,7 +187,7 @@ export default function WarungSayurPage() {
               {filteredProducts.length} produk tersedia
             </p>
           </div>
-          {totalItems > 0 && (
+          {mounted && totalItems > 0 && (
             <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-sm font-semibold animate-in fade-in slide-in-from-right-4 duration-300 shadow-sm">
               {totalItems} item di keranjang
             </div>

@@ -1,0 +1,41 @@
+{
+  "name": "recharts",
+  "version": "2.12.0",
+  "description": "React charting library for Warung Akang admin panel",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/recharts/recharts.git"
+  },
+  "keywords": [
+    "react",
+    "charts",
+    "data visualization",
+    "bar chart",
+    "line chart"
+  ],
+  "author": "Recharts Group",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/recharts/recharts/issues"
+  },
+  "homepage": "https://recharts.org",
+  "peerDependencies": {
+    "react": "^16.0.0 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.0.0 || ^17.0.0 || ^18.0.0"
+  },
+  "dependencies": {
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.1.0",
+    "d3-time": "^3.0.0",
+    "eventemitter3": "^4.0.0",
+    "react-is": "^18.0.0",
+    "react-transition-group": "^4.4.0",
+    "victory-vendor": "^36.6.8"
+  }
+}

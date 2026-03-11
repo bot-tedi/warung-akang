@@ -1,12 +1,13 @@
 'use client';
 
-import { Plus, Check } from 'lucide-react';
+import { Plus, Check, Package, AlertTriangle } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
 import { memo, useState } from 'react';
 
 const ProductCard = memo(function ProductCard({ product, variant = 'default' }) {
   const { addItem } = useCartStore();
   const [isAdding, setIsAdding] = useState(false);
+  const [error, setError] = useState('');
 
   const isAsinan = variant === 'asinan' || product.type === 'asinan_sayur';
   const themeColor = isAsinan ? 'emerald' : 'emerald'; // Konsisten profesional
@@ -19,10 +20,17 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
     }).format(price);
   };
 
-  const handleAddToCart = () => {
-    addItem(product);
-    setIsAdding(true);
-    setTimeout(() => setIsAdding(false), 800);
+  const handleAddToCart = async () => {
+    setError('');
+    try {
+      setIsAdding(true);
+      await addItem(product);
+      setTimeout(() => setIsAdding(false), 800);
+    } catch (err) {
+      setError(err.message);
+      setIsAdding(false);
+      setTimeout(() => setError(''), 3000);
+    }
   };
 
   return (
@@ -41,6 +49,24 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
           <span className="px-4 py-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white shadow-sm dark:shadow-lg">
             {isAsinan ? 'Signature' : 'Fresh Market'}
           </span>
+        </div>
+
+        {/* Stock Indicator */}
+        <div className="absolute top-5 right-5">
+          <div className={`px-3 py-1.5 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-sm dark:shadow-lg flex items-center gap-1 ${product.stock <= 0
+              ? 'bg-red-500/90 text-white'
+              : product.stock <= 10
+                ? 'bg-amber-500/90 text-white'
+                : 'bg-emerald-500/90 text-white'
+            }`}>
+            {product.stock <= 0 ? (
+              <><AlertTriangle className="w-3 h-3" /> Out of Stock</>
+            ) : product.stock <= 10 ? (
+              <><Package className="w-3 h-3" /> {product.stock} left</>
+            ) : (
+              <><Package className="w-3 h-3" /> {product.stock} pcs</>
+            )}
+          </div>
         </div>
       </div>
 
@@ -63,23 +89,37 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
             <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               {formatPrice(product.price)}
             </span>
+            {product.stock <= 10 && product.stock > 0 && (
+              <span className="text-[8px] text-amber-500 font-medium mt-1">Only {product.stock} left</span>
+            )}
           </div>
 
           <button
             onClick={handleAddToCart}
-            disabled={isAdding}
-            className={`relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg ${isAdding
-                ? 'bg-emerald-500 shadow-emerald-200 dark:shadow-emerald-600/30'
-                : 'bg-slate-900 dark:bg-emerald-600 hover:bg-emerald-600 dark:hover:bg-emerald-700 shadow-slate-200 dark:shadow-emerald-600/20'
+            disabled={isAdding || product.stock <= 0}
+            className={`relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg ${product.stock <= 0
+                ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed'
+                : isAdding
+                  ? 'bg-emerald-500 shadow-emerald-200 dark:shadow-emerald-600/30'
+                  : 'bg-slate-900 dark:bg-emerald-600 hover:bg-emerald-600 dark:hover:bg-emerald-700 shadow-slate-200 dark:shadow-emerald-600/20'
               }`}
           >
-            {isAdding ? (
+            {product.stock <= 0 ? (
+              <AlertTriangle className="w-5 h-5 text-white/50" />
+            ) : isAdding ? (
               <Check className="w-5 h-5 text-white" />
             ) : (
               <Plus className="w-5 h-5 text-white" />
             )}
           </button>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+            <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   );

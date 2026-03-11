@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { useTheme } from 'next-themes';
+import { decreaseStock, checkProductAvailability } from '@/lib/supabase';
 import {
   ArrowLeft,
   Upload,
@@ -167,6 +168,31 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validate stock availability before proceeding
+    console.log('🔍 Checking stock availability...');
+    try {
+      for (const item of items) {
+        const availability = await checkProductAvailability(item.id, item.quantity);
+        if (!availability.available) {
+          console.log(`❌ Insufficient stock for ${item.name}. Available: ${availability.currentStock}, Requested: ${item.quantity}`);
+          setError(`Stok tidak mencukupi untuk ${item.name}. Tersedia: ${availability.currentStock} pcs`);
+          return;
+        }
+      }
+      console.log('✅ All items have sufficient stock');
+    } catch (error) {
+      console.error('Error checking stock:', error);
+      setError('Error checking stock availability: ' + error.message);
+      return;
+    }
+
+    // Basic anti-spam rate limiting (1 order per minute)
+    const lastOrderTime = localStorage.getItem('last_warung_order_time');
+    if (lastOrderTime && Date.now() - parseInt(lastOrderTime) < 60000) {
+      setError('Mohon tunggu 1 menit sebelum membuat pesanan baru untuk mencegah spam.');
+      return;
+    }
+
     console.log('✅ Validation passed, starting submit...');
     setIsSubmitting(true);
     setError('');
@@ -237,6 +263,21 @@ export default function CheckoutPage() {
         throw new Error(`Gagal menyimpan pesanan: ${insertError.message}`);
       }
 
+      // 3. Decrease stock after order is successfully saved
+      console.log('📦 Decreasing stock for ordered items...');
+      try {
+        await decreaseStock(items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity
+        })));
+        console.log('✅ Stock decreased successfully');
+      } catch (stockError) {
+        console.error('Error decreasing stock:', stockError);
+        // Don't fail the order, but log the error for manual correction
+        console.warn('⚠️ Order saved but stock update failed - manual correction needed');
+      }
+
       setUploadProgress(100);
 
       // 3. Clear cart BEFORE redirect
@@ -264,6 +305,9 @@ export default function CheckoutPage() {
         `https://wa.me/6285775339643?text=${message}`,
         '_blank'
       );
+
+      // Setup anti-spam cooldown for next order
+      localStorage.setItem('last_warung_order_time', Date.now().toString());
 
       // 5. Redirect to success page
       router.push('/success');
@@ -379,7 +423,7 @@ export default function CheckoutPage() {
                 <div className="p-6 rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm dark:shadow-lg hover:border-emerald-200 dark:hover:border-emerald-700 transition-colors">
                   <div className="flex items-center justify-between mb-4">
                     <div className="px-3 py-1 bg-purple-600 text-[10px] font-bold text-white rounded-md">OVO</div>
-                   <button
+                    <button
                       onClick={() => copyToClipboard('085775339643', event.target)}
                       className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline uppercase tracking-widest"
                     >
@@ -389,7 +433,7 @@ export default function CheckoutPage() {
                   <p className="text-xs font-bold text-slate-900 dark:text-white mb-1">0857-7533-9643</p>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest">OVO</p>
                 </div>
-                
+
               </div>
             </section>
 

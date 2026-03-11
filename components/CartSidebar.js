@@ -3,9 +3,13 @@
 import { ShoppingCart, X, Plus, Minus, Trash2, ArrowRight } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 
 export default function CartSidebar() {
   const { items, isCartOpen, closeCart, updateQuantity, removeItem, getTotalPrice } = useCartStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('id-ID', {
@@ -15,7 +19,7 @@ export default function CartSidebar() {
     }).format(price);
   };
 
-  if (!isCartOpen) return null;
+  if (!mounted || !isCartOpen) return null;
 
   return (
     <>

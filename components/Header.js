@@ -58,7 +58,7 @@ const Header = memo(function Header() {
             <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 dark:text-slate-900">Cart</span>
             <div className="relative bg-white/10 p-2 rounded-full">
               <ShoppingCart className="w-4 h-4 text-white" />
-              {totalItems > 0 && (
+              {mounted && totalItems > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 dark:bg-white text-white dark:text-emerald-600 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-slate-900 dark:ring-emerald-600">
                   {totalItems}
                 </span>

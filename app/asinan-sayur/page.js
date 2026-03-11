@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchProductsByType } from '@/lib/supabase';
+import { fuzzyMatch } from '@/lib/utils';
 import { useCartStore } from '@/store/cartStore';
 import { useTheme } from 'next-themes';
 import Header from '@/components/Header';
@@ -55,7 +56,7 @@ export default function AsinanSayurPage() {
   }, []);
 
   const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    fuzzyMatch(product.name, searchQuery)
   );
 
   return (
@@ -144,7 +145,7 @@ export default function AsinanSayurPage() {
             <h2 className="text-3xl font-light text-slate-900 tracking-tight">Our Collection</h2>
             <div className="h-1 w-12 bg-orange-500 mt-4" />
           </div>
-          {totalItems > 0 && (
+          {mounted && totalItems > 0 && (
             <div className="flex items-center gap-3 text-sm font-medium text-orange-700 bg-orange-50 px-5 py-2.5 rounded-full">
               <ShoppingBag className="w-4 h-4" />
               <span>{totalItems} Selected Items</span>

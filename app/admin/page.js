@@ -2,19 +2,21 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  Plus, 
-  Search, 
-  Trash2, 
-  Edit3, 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  Clock, 
-  CheckCircle, 
+import { getRealTimeStats, updateProductStock, increaseStock, decreaseStock } from '@/lib/supabase';
+import { fuzzyMatch } from '@/lib/utils';
+import {
+  Search,
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Plus,
+  Trash2,
+  Edit3,
+  TrendingUp,
+  Users,
+  DollarSign,
+  Clock,
+  CheckCircle,
   XCircle,
   LogOut,
   Upload,
@@ -26,16 +28,18 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import MonthlyRevenueChart from '@/components/MonthlyRevenueChart';
 
 // --- Auth & Config (Tetap sesuai sistem Anda) ---
 const ADMIN_PASSWORD_HASH = 'W4rung@k4ng2024!S3cur3';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState('dashboard'); 
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
-  
+
   // Data State (Tetap sesuai sistem Anda)
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -45,11 +49,25 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
-    name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: ''
+    name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+    });
+
+    // Listen for auth changes (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -67,6 +85,117 @@ export default function AdminPage() {
     if (oRes.data) setOrders(oRes.data);
     setLoading(false);
   };
+
+  // Real-time stats update
+  const [realTimeStats, setRealTimeStats] = useState({
+    totalRevenue: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    cancelledOrders: 0,
+    totalProducts: 0,
+    totalStockValue: 0,
+    lowStockProducts: 0,
+    totalOrders: 0,
+    previousRevenue: 0 // Store previous revenue for growth calculation
+  });
+
+  // Calculate growth percentage
+  const calculateGrowth = (current, previous) => {
+    if (previous === 0) return '+0%';
+    const growth = ((current - previous) / previous) * 100;
+    return growth >= 0 ? `+${growth.toFixed(1)}%` : `${growth.toFixed(1)}%`;
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('🔧 Setting up real-time subscriptions...');
+
+      const updateStats = async () => {
+        try {
+          console.log('📊 Updating stats...');
+          const stats = await getRealTimeStats();
+          console.log('📈 New stats:', stats);
+
+          // Update with growth calculation
+          setRealTimeStats(prev => {
+            const growthPercentage = calculateGrowth(stats.totalRevenue, prev.previousRevenue || stats.totalRevenue);
+            return {
+              ...stats,
+              previousRevenue: stats.totalRevenue, // Store current as previous for next update
+            };
+          });
+        } catch (error) {
+          console.error('❌ Error updating stats:', error);
+        }
+      };
+
+      // Initial fetch
+      updateStats();
+
+      // Set up real-time subscription for orders
+      const ordersChannel = supabase.channel('admin-orders-changes');
+
+      const ordersSubscription = ordersChannel
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: 'status=eq.pending_verification'
+          },
+          (payload) => {
+            console.log('📦 Orders change detected:', payload);
+            updateStats();
+            fetchInitialData();
+          }
+        )
+        .subscribe((status) => {
+          console.log('📦 Orders subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Orders subscription active');
+          } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.log('⚠️ Orders subscription failed, retrying...');
+            setTimeout(() => ordersSubscription.subscribe(), 5000);
+          }
+        });
+
+      // Set up real-time subscription for products
+      const productsChannel = supabase.channel('admin-products-changes');
+
+      const productsSubscription = productsChannel
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'products'
+          },
+          (payload) => {
+            console.log('🛍️ Products change detected:', payload);
+            updateStats();
+            fetchInitialData();
+          }
+        )
+        .subscribe((status) => {
+          console.log('🛍️ Products subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Products subscription active');
+          } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.log('⚠️ Products subscription failed, retrying...');
+            setTimeout(() => productsSubscription.subscribe(), 5000);
+          }
+        });
+
+      // Fallback interval for backup
+      const interval = setInterval(updateStats, 10000); // Update every 10 seconds
+
+      return () => {
+        console.log('🧹 Cleaning up subscriptions...');
+        clearInterval(interval);
+        ordersChannel.unsubscribe();
+        productsChannel.unsubscribe();
+      };
+    }
+  }, [isAuthenticated]);
 
   // Image upload handlers
   const handleImageSelect = (e) => {
@@ -100,12 +229,12 @@ export default function AdminPage() {
 
   const uploadImage = async () => {
     if (!imageFile) return null;
-    
+
     setIsUploading(true);
     try {
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `products/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('product-images')
         .upload(fileName, imageFile, {
@@ -137,7 +266,7 @@ export default function AdminPage() {
 
     try {
       let imageUrl = formData.image_url;
-      
+
       if (imageFile) {
         imageUrl = await uploadImage();
         if (!imageUrl) return;
@@ -150,6 +279,7 @@ export default function AdminPage() {
         category: formData.category,
         description: formData.description,
         image_url: imageUrl,
+        stock: parseInt(formData.stock) || 0,
       };
 
       if (editingProduct) {
@@ -159,7 +289,7 @@ export default function AdminPage() {
       }
 
       // Reset form
-      setFormData({ name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '' });
+      setFormData({ name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0 });
       setImageFile(null);
       setImagePreview(null);
       setIsModalOpen(false);
@@ -173,32 +303,168 @@ export default function AdminPage() {
 
   // --- Logic Dashboard (Logic tetap, hanya format visual diperhalus) ---
   const stats = useMemo(() => {
-    const totalRevenue = orders.reduce((acc, curr) => acc + (curr.total_price || 0), 0);
-    const pendingOrders = orders.filter(o => o.status === 'pending').length;
+    const revenueGrowth = calculateGrowth(realTimeStats.totalRevenue, realTimeStats.previousRevenue);
+
     return [
-      { label: 'Total Revenue', value: `Rp ${totalRevenue.toLocaleString()}`, icon: DollarSign, trend: '+12%', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-      { label: 'New Orders', value: pendingOrders, icon: ShoppingCart, trend: 'Action Needed', color: 'text-amber-600', bg: 'bg-amber-50' },
-      { label: 'Total Products', value: products.length, icon: Package, trend: 'Active', color: 'text-blue-600', bg: 'bg-blue-50' },
-      { label: 'Total Customers', value: new Set(orders.map(o => o.customer_name)).size, icon: Users, trend: 'Loyalists', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+      { label: 'Total Revenue', value: `Rp ${realTimeStats.totalRevenue.toLocaleString()}`, icon: DollarSign, trend: revenueGrowth, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      { label: 'Pending Orders', value: realTimeStats.pendingOrders, icon: ShoppingCart, trend: 'Action Needed', color: 'text-amber-600', bg: 'bg-amber-50' },
+      { label: 'Completed Orders', value: realTimeStats.completedOrders, icon: CheckCircle, trend: 'Success', color: 'text-green-600', bg: 'bg-green-50' },
+      { label: 'Cancelled Orders', value: realTimeStats.cancelledOrders, icon: XCircle, trend: 'Lost', color: 'text-red-600', bg: 'bg-red-50' },
     ];
-  }, [orders, products]);
+  }, [realTimeStats, realTimeStats.previousRevenue]);
 
   // --- Handlers (Fungsi tidak diubah sama sekali) ---
-  const handleLogin = (e) => {
+  // --- Data Reset (Security & Maintenance) ---
+  const handleResetAllData = async () => {
+    const confirmPrompt = window.prompt("PERINGATAN BAHAYA!\n\nTindakan ini akan MENGHAPUS SEMUA DATA TRANSAKSI (Orders) dan PENDAPATAN BULANAN (Monthly Revenue) secara permanen.\n\nKetik 'RESET SAYA YAKIN' untuk melanjutkan:");
+    
+    if (confirmPrompt !== "RESET SAYA YAKIN") {
+      alert("Reset dibatalkan.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log('🗑️ Menghapus data Revenue...');
+      const { error: revError } = await supabase.from('monthly_revenue').delete().neq('month', 'xx_dummy_xx'); // Delete all
+      if (revError) throw revError;
+
+      console.log('🗑️ Menghapus data Orders...');
+      const { error: orderError } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      if (orderError) throw orderError;
+
+      alert('Berhasil mereset seluruh data transaksi dan pendapatan!');
+      
+      // Reset stats in UI immediately
+      setRealTimeStats({
+        totalRevenue: 0, pendingOrders: 0, completedOrders: 0,
+        cancelledOrders: 0, totalProducts: realTimeStats.totalProducts,
+        totalStockValue: realTimeStats.totalStockValue,
+        lowStockProducts: realTimeStats.lowStockProducts,
+        totalOrders: 0, previousRevenue: 0
+      });
+      setOrders([]);
+      await fetchInitialData();
+    } catch (error) {
+      console.error('❌ Error resetting data:', error);
+      alert('Gagal mereset data: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD_HASH) setIsAuthenticated(true);
-    else alert('Akses Ditolak');
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      alert('Akses Ditolak: ' + error.message);
+    }
+    setLoading(false);
   };
 
   const handleUpdateStatus = async (orderId, newStatus) => {
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-    if (!error) fetchInitialData();
+    console.log(`🔄 Updating order ${orderId} to status: ${newStatus}`);
+
+    try {
+      const order = orders.find(o => o.id === orderId);
+
+      if (order) {
+        console.log('📦 Found order:', order);
+
+        // Parse order items from items_summary or items field
+        let orderItems = [];
+        if (order.items) {
+          orderItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+        } else if (order.items_summary) {
+          // Try to extract items from summary - basic parsing
+          try {
+            // If items_summary contains JSON data
+            if (order.items_summary.includes('{')) {
+              orderItems = JSON.parse(order.items_summary);
+            } else {
+              // Fallback: don't create dummy item for stock update if we don't know the real products
+              orderItems = [];
+            }
+          } catch (e) {
+            console.log('Error parsing items_summary:', e);
+            orderItems = [];
+          }
+        }
+
+        console.log('🛒 Order items:', orderItems);
+
+        // Filter out dummy items from past bugs (where item.id === order.id)
+        if (orderItems && orderItems.length > 0) {
+          orderItems = orderItems.filter(item => item.id !== orderId && item.id !== 'dssdsdsds');
+        }
+
+        // Handle stock changes based on status - RE-ENABLED WITH CORRECT FIELD NAMES
+        if (newStatus === 'completed' && order.status !== 'completed') {
+          console.log('✅ Decreasing stock for completed order...');
+          try {
+            await decreaseStock(orderItems);
+          } catch (stockError) {
+            console.error('⚠️ Stock management error:', stockError);
+            // Don't fail the order update, just log the error
+          }
+        } else if (newStatus === 'cancelled' && order.status === 'pending') {
+          console.log('↩️ Increasing stock for cancelled order...');
+          try {
+            await increaseStock(orderItems);
+          } catch (stockError) {
+            console.error('⚠️ Stock management error:', stockError);
+            // Don't fail the order update, just log the error
+          }
+        }
+
+        // Update order status in database
+        const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+
+        if (error) {
+          console.error('❌ Error updating order status:', error);
+          throw error;
+        }
+
+        console.log('✅ Order status updated successfully');
+
+        // Refresh data immediately
+        await fetchInitialData();
+
+        // Force stats update
+        try {
+          const stats = await getRealTimeStats();
+          console.log('📊 Updated stats after status change:', stats);
+          setRealTimeStats(stats);
+        } catch (statsError) {
+          console.error('❌ Error updating stats:', statsError);
+        }
+      } else {
+        console.error('❌ Order not found:', orderId);
+      }
+    } catch (error) {
+      console.error('❌ Error updating order status:', error);
+      alert('Error updating order status: ' + error.message);
+    }
   };
 
   const handleDeleteProduct = async (id) => {
     if (confirm('Hapus produk ini secara permanen?')) {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (!error) fetchInitialData();
+    }
+  };
+
+  const handleUpdateStock = async (productId, newStock) => {
+    try {
+      await updateProductStock(productId, parseInt(newStock));
+      fetchInitialData();
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      alert('Error updating stock: ' + error.message);
     }
   };
 
@@ -213,13 +479,27 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-center text-slate-900 mb-2 uppercase tracking-tighter">Admin Portal</h1>
           <p className="text-slate-400 text-sm text-center mb-8">Enter secure key to access dashboard</p>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input 
-              type="password" 
-              placeholder="••••••••" 
-              className="w-full px-6 py-4 bg-slate-50 border-none ring-1 ring-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none text-center tracking-[0.5em]"
-              onChange={(e) => setPassword(e.target.value)}
+            <input
+              type="email"
+              placeholder="admin@warungakang.com"
+              className="w-full px-6 py-4 bg-slate-50 border-none ring-1 ring-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none tracking-widest"
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
-            <button className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all">Authenticate</button>
+            <input
+              type="password"
+              placeholder="••••••••"
+              className="w-full px-6 py-4 bg-slate-50 border-none ring-1 ring-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 transition-all outline-none tracking-[0.5em]"
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all disabled:bg-slate-400"
+            >
+              {loading ? 'Authenticating...' : 'Authenticate'}
+            </button>
           </form>
         </motion.div>
       </div>
@@ -228,65 +508,89 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex text-slate-900">
-      {/* --- Sidebar Desktop --- */}
-      <aside className="w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col p-8 sticky top-0 h-screen">
-        <div className="flex items-center gap-3 mb-16">
-          <div className="bg-slate-900 p-2 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
+      {/* --- Responsive Sidebar --- */}
+      <aside className="w-64 lg:w-72 bg-white border-r border-slate-100 hidden md:flex flex-col p-4 lg:p-8 sticky top-0 h-screen">
+        <div className="flex items-center gap-2 lg:gap-3 mb-8 lg:mb-16">
+          <div className="bg-slate-900 p-1.5 lg:p-2 rounded-lg">
+            <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-400" />
           </div>
-          <span className="font-bold uppercase tracking-tighter text-lg">Akang<span className="text-emerald-600">Admin</span></span>
+          <span className="font-bold uppercase tracking-tighter text-sm lg:text-lg">Akang<span className="text-emerald-600">Admin</span></span>
         </div>
 
-        <nav className="space-y-2 flex-grow">
+        <nav className="space-y-1 lg:space-y-2 flex-grow">
           {[
             { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
             { id: 'orders', label: 'Order List', icon: ShoppingCart },
             { id: 'products', label: 'Inventory', icon: Package },
+            { id: 'revenue', label: 'Pendapatan', icon: TrendingUp },
           ].map((nav) => (
             <button
               key={nav.id}
               onClick={() => setActiveTab(nav.id)}
-              className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${
-                activeTab === nav.id ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-              }`}
+              className={`w-full flex items-center gap-3 lg:gap-4 px-3 lg:px-5 py-2.5 lg:py-4 rounded-xl lg:rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${activeTab === nav.id ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                }`}
             >
-              <nav.icon className="w-4 h-4" />
-              {nav.label}
+              <nav.icon className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+              <span className="hidden lg:block">{nav.label}</span>
+              <span className="lg:hidden text-xs">{nav.label.slice(0, 3)}</span>
             </button>
           ))}
         </nav>
 
-        <button onClick={() => setIsAuthenticated(false)} className="flex items-center gap-4 px-5 py-4 text-xs font-bold uppercase tracking-widest text-red-400 hover:bg-red-50 rounded-2xl transition-all">
-          <LogOut className="w-4 h-4" /> Sign Out
+        <button onClick={async () => await supabase.auth.signOut()} className="flex items-center gap-3 lg:gap-4 px-3 lg:px-5 py-2.5 lg:py-4 text-xs font-bold uppercase tracking-widest text-red-400 hover:bg-red-50 rounded-xl lg:rounded-2xl transition-all">
+          <LogOut className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+          <span className="hidden lg:block">Sign Out</span>
         </button>
       </aside>
 
+      {/* --- Mobile Navigation --- */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50">
+        <div className="flex justify-around py-2">
+          {[
+            { id: 'dashboard', icon: LayoutDashboard },
+            { id: 'orders', icon: ShoppingCart },
+            { id: 'products', icon: Package },
+            { id: 'revenue', icon: TrendingUp },
+          ].map((nav) => (
+            <button
+              key={nav.id}
+              onClick={() => setActiveTab(nav.id)}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all ${activeTab === nav.id ? 'text-emerald-600' : 'text-slate-400'
+                }`}
+            >
+              <nav.icon className="w-5 h-5" />
+              <span className="text-xs">{nav.id.slice(0, 4)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* --- Main Content --- */}
-      <main className="flex-grow p-6 lg:p-12 max-w-7xl mx-auto">
+      <main className="flex-grow p-4 lg:p-6 xl:p-12 max-w-7xl mx-auto pb-20 md:pb-0">
         {/* Header Section */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 lg:gap-6 mb-8 lg:mb-12">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-600 mb-2">Internal Management</p>
-            <h1 className="text-3xl font-light tracking-tight capitalize">{activeTab} Panel</h1>
+            <p className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.3em] text-emerald-600 mb-1 lg:mb-2">Internal Management</p>
+            <h1 className="text-2xl lg:text-3xl font-light tracking-tight capitalize">{activeTab} Panel</h1>
           </div>
-          
-          <div className="flex items-center gap-4">
+
+          <div className="flex items-center gap-3 lg:gap-4">
             <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="text" 
+              <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 lg:w-4 lg:h-4 text-slate-400" />
+              <input
+                type="text"
                 placeholder="Quick search..."
-                className="pl-11 pr-6 py-3 bg-white border border-slate-100 rounded-full text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 w-64 shadow-sm"
+                className="pl-9 lg:pl-11 pr-3 lg:pr-6 py-2 lg:py-3 bg-white border border-slate-100 rounded-full text-xs lg:text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 w-48 lg:w-64 shadow-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             {activeTab === 'products' && (
-              <button 
+              <button
                 onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
-                className="bg-emerald-600 text-white p-3 rounded-full hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+                className="bg-emerald-600 text-white p-2 lg:p-3 rounded-full hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
               </button>
             )}
           </div>
@@ -294,20 +598,20 @@ export default function AdminPage() {
 
         {/* --- Tab Content: Dashboard --- */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-12">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="space-y-8 lg:space-y-12">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               {stats.map((s, i) => (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
-                  key={i} className="bg-white p-8 rounded-[2rem] border border-slate-50 shadow-sm"
+                  key={i} className="bg-white p-4 lg:p-8 rounded-xl lg:rounded-[2rem] border border-slate-50 shadow-sm"
                 >
-                  <div className={`${s.bg} w-12 h-12 rounded-2xl flex items-center justify-center mb-6`}>
-                    <s.icon className={`w-6 h-6 ${s.color}`} />
+                  <div className={`${s.bg} w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 lg:mb-6`}>
+                    <s.icon className={`w-5 h-5 lg:w-6 lg:h-6 ${s.color}`} />
                   </div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{s.label}</p>
-                  <h3 className="text-2xl font-bold text-slate-900">{s.value}</h3>
-                  <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-600">
-                    <ArrowUpRight className="w-3 h-3" /> {s.trend}
+                  <p className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{s.label}</p>
+                  <h3 className="text-lg lg:text-2xl font-bold text-slate-900">{s.value}</h3>
+                  <div className="mt-3 lg:mt-4 flex items-center gap-2 text-[9px] lg:text-[10px] font-bold text-emerald-600">
+                    <ArrowUpRight className="w-2.5 h-2.5 lg:w-3 lg:h-3" /> {s.trend}
                   </div>
                 </motion.div>
               ))}
@@ -316,7 +620,16 @@ export default function AdminPage() {
             {/* Recent Orders Preview */}
             <div className="bg-white rounded-[2.5rem] border border-slate-50 overflow-hidden shadow-sm">
               <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-                <h2 className="font-bold uppercase tracking-widest text-xs">Recent Transactions</h2>
+                <h2 className="font-bold uppercase tracking-widest text-xs flex items-center gap-2">
+                  Recent Transactions
+                  <button 
+                    onClick={handleResetAllData} 
+                    className="ml-4 px-3 py-1 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-600 hover:text-white transition-all flex items-center gap-1"
+                    title="Hapus Semua Data Transaksi & Pendapatan"
+                  >
+                    <Trash2 className="w-3 h-3" /> RESET DATA
+                  </button>
+                </h2>
                 <button onClick={() => setActiveTab('orders')} className="text-xs font-bold text-emerald-600 hover:underline">View All</button>
               </div>
               <div className="overflow-x-auto">
@@ -330,14 +643,13 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {orders.slice(0, 5).map((order) => (
+                    {orders.filter(o => o.status === 'pending' || o.status === 'pending_verification').slice(0, 5).map((order) => (
                       <tr key={order.id} className="text-sm hover:bg-slate-50/50 transition-colors">
                         <td className="px-8 py-5 font-medium">{order.customer_name}</td>
-                        <td className="px-8 py-5">Rp {order.total_price?.toLocaleString()}</td>
+                        <td className="px-8 py-5">Rp {order.total_amount?.toLocaleString()}</td>
                         <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            order.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${order.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
                             {order.status}
                           </span>
                         </td>
@@ -346,6 +658,13 @@ export default function AdminPage() {
                         </td>
                       </tr>
                     ))}
+                    {orders.filter(o => o.status === 'pending' || o.status === 'pending_verification').length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="px-8 py-8 text-center text-slate-400 text-sm">
+                          No pending transactions
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -369,23 +688,43 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {orders.filter(o => o.customer_name.toLowerCase().includes(searchQuery.toLowerCase())).map((order) => (
+                  {orders.filter(o =>
+                    fuzzyMatch(o.customer_name, searchQuery) &&
+                    (o.status === 'pending' || o.status === 'pending_verification')
+                  ).map((order) => (
                     <tr key={order.id} className="hover:bg-slate-50/30 transition-all group">
-                      <td className="px-8 py-6 text-[10px] font-mono text-slate-400">#{order.id.slice(0,8)}</td>
+                      <td className="px-8 py-6 text-[10px] font-mono text-slate-400">#{order.id.slice(0, 8)}</td>
                       <td className="px-8 py-6">
                         <p className="font-bold text-sm text-slate-900">{order.customer_name}</p>
                         <p className="text-xs text-slate-400">{order.customer_phone}</p>
                       </td>
                       <td className="px-8 py-6 max-w-xs">
-                        <p className="text-xs text-slate-500 line-clamp-1 italic">{order.items_summary || 'Manual items list'}</p>
+                        <div className="text-xs text-slate-500">
+                          {order.items && order.items.length > 0 ? (
+                            <div>
+                              {order.items.slice(0, 2).map((item, idx) => (
+                                <div key={idx} className="mb-1">
+                                  {item.name} x{item.quantity}
+                                </div>
+                              ))}
+                              {order.items.length > 2 && (
+                                <div className="text-slate-400">+{order.items.length - 2} more</div>
+                              )}
+                            </div>
+                          ) : order.items_summary ? (
+                            <p className="line-clamp-1 italic">{order.items_summary}</p>
+                          ) : (
+                            <p className="text-slate-400">No items data</p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-8 py-6">
-                         <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${order.status === 'pending' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{order.status}</span>
-                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${order.status === 'pending' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">{order.status}</span>
+                        </div>
                       </td>
-                      <td className="px-8 py-6 font-bold text-sm">Rp {order.total_price?.toLocaleString()}</td>
+                      <td className="px-8 py-6 font-bold text-sm">Rp {order.total_amount?.toLocaleString()}</td>
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-2">
                           <button onClick={() => handleUpdateStatus(order.id, 'completed')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><CheckCircle className="w-4 h-4" /></button>
@@ -400,27 +739,47 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* --- Tab Content: Revenue --- */}
+        {activeTab === 'revenue' && (
+          <MonthlyRevenueChart />
+        )}
+
         {/* --- Tab Content: Products --- */}
         {activeTab === 'products' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-8">
             <AnimatePresence>
-              {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map((product) => (
-                <motion.div 
+              {products.filter(p => fuzzyMatch(p.name, searchQuery)).map((product) => (
+                <motion.div
                   layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  key={product.id} className="bg-white p-6 rounded-[2rem] border border-slate-50 shadow-sm group hover:shadow-xl hover:shadow-slate-200/50 transition-all"
+                  key={product.id} className="bg-white p-4 lg:p-6 rounded-xl lg:rounded-[2rem] border border-slate-50 shadow-sm group hover:shadow-xl hover:shadow-slate-200/50 transition-all"
                 >
-                  <div className="aspect-square rounded-2xl overflow-hidden bg-slate-50 mb-6 relative">
+                  <div className="aspect-square rounded-xl lg:rounded-2xl overflow-hidden bg-slate-50 mb-4 lg:mb-6 relative">
                     <img src={product.image_url || '/placeholder.png'} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt={product.name} />
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="bg-white p-2 rounded-full shadow-lg text-slate-600 hover:text-emerald-600"><Edit3 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDeleteProduct(product.id)} className="bg-white p-2 rounded-full shadow-lg text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    <div className="absolute top-2 lg:top-4 right-2 lg:right-4 flex gap-1 lg:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button className="bg-white p-1.5 lg:p-2 rounded-full shadow-lg text-slate-600 hover:text-emerald-600"><Edit3 className="w-3 h-3 lg:w-4 lg:h-4" /></button>
+                      <button onClick={() => handleDeleteProduct(product.id)} className="bg-white p-1.5 lg:p-2 rounded-full shadow-lg text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3 lg:w-4 lg:h-4" /></button>
                     </div>
                   </div>
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-slate-900 tracking-tight">{product.name}</h3>
-                    <span className="text-xs font-black text-emerald-600">Rp {product.price.toLocaleString()}</span>
+                    <h3 className="font-bold text-sm lg:text-base text-slate-900 tracking-tight">{product.name}</h3>
+                    <span className="text-xs lg:text-sm font-black text-emerald-600">Rp {product.price.toLocaleString()}</span>
                   </div>
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-300">{product.category}</p>
+                  <p className="text-[9px] lg:text-[10px] uppercase font-bold tracking-widest text-slate-300">{product.category}</p>
+                  <div className="mt-2 lg:mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-1 lg:gap-2">
+                      <span className="text-[9px] lg:text-[10px] font-bold text-slate-400">Stock:</span>
+                      <span className={`text-xs lg:text-sm font-bold ${product.stock <= 10 ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {product.stock} pcs
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      value={product.stock}
+                      onChange={(e) => handleUpdateStock(product.id, e.target.value)}
+                      className="w-14 lg:w-16 px-1.5 lg:px-2 py-1 text-xs border border-slate-200 rounded text-center"
+                      min="0"
+                    />
+                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -428,41 +787,42 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* --- Add Product Modal (Desain baru, Sistem Placeholder tetap) --- */}
+      {/* --- Add Product Modal (Responsive Design) --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
-           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-2xl rounded-[3rem] p-12 relative shadow-2xl">
-              <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-slate-400 hover:text-slate-900"><XCircle className="w-8 h-8" /></button>
-              <h2 className="text-3xl font-light mb-8 italic font-serif">Add New Product</h2>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Product Name</label>
-                    <input 
-                      type="text" 
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      placeholder="e.g. Wortel Organik" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Price (IDR)</label>
-                    <input 
-                      type="number" 
-                      value={formData.price}
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20" 
-                      placeholder="15000" 
-                    />
-                  </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-6 lg:p-12 relative shadow-2xl">
+            <button onClick={() => setIsModalOpen(false)} className="absolute top-4 lg:top-8 right-4 lg:right-8 text-slate-400 hover:text-slate-900"><XCircle className="w-6 h-6 lg:w-8 lg:h-8" /></button>
+            <h2 className="text-2xl lg:text-3xl font-light mb-6 lg:mb-8 italic font-serif">Add New Product</h2>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+              <div className="space-y-4 lg:space-y-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Product Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder="e.g. Wortel Organik"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Price (IDR)</label>
+                  <input
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder="15000"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Type</label>
-                    <select 
+                    <select
                       value={formData.type}
-                      onChange={(e) => setFormData({...formData, type: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
+                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                      className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
                     >
                       <option value="warung_sayur">Warung Sayur</option>
                       <option value="asinan_sayur">Asinan Signature</option>
@@ -470,10 +830,10 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Category</label>
-                    <select 
+                    <select
                       value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
                     >
                       <option value="sayuran">Sayuran</option>
                       <option value="buah">Buah-Buahan</option>
@@ -482,57 +842,69 @@ export default function AdminPage() {
                       <option value="lainnya">Lainnya</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Description</label>
-                    <textarea 
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      className="w-full px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none" 
-                      rows={3}
-                      placeholder="Product description..."
-                    />
-                  </div>
                 </div>
-
-                <div className="space-y-6">
-                  <div 
-                    className="aspect-square bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer relative overflow-hidden"
-                    onDrop={handleImageDrop}
-                    onDragOver={(e) => e.preventDefault()}
-                    onClick={() => document.getElementById('image-upload').click()}
-                  >
-                    <input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
-                    {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-                    ) : (
-                      <>
-                        <Upload className="w-8 h-8 mb-4 group-hover:scale-110 transition-transform" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Click to upload image</span>
-                        <p className="text-[9px] mt-2">Max size: 5MB</p>
-                      </>
-                    )}
-                    {isUploading && (
-                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
-                      </div>
-                    )}
-                  </div>
-                  <button 
-                    onClick={handleSaveProduct}
-                    disabled={isUploading}
-                    className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold text-[10px] uppercase tracking-[0.3em] hover:bg-emerald-600 transition-all shadow-xl disabled:opacity-50"
-                  >
-                    {isUploading ? 'Uploading...' : 'Save to Inventory'}
-                  </button>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none"
+                    rows={3}
+                    placeholder="Product description..."
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Stock Quantity</label>
+                  <input
+                    type="number"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder="0"
+                    min="0"
+                  />
                 </div>
               </div>
-           </motion.div>
+
+              <div className="space-y-4 lg:space-y-6">
+                <div
+                  className="aspect-square lg:aspect-square bg-slate-50 rounded-2xl lg:rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 group hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer relative overflow-hidden"
+                  onDrop={handleImageDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => document.getElementById('image-upload').click()}
+                >
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6 lg:w-8 lg:h-8 mb-4 group-hover:scale-110 transition-transform" />
+                      <span className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest text-center">Click to upload image</span>
+                      <p className="text-[8px] lg:text-[9px] mt-2">Max size: 5MB</p>
+                    </>
+                  )}
+                  {isUploading && (
+                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 lg:w-8 lg:h-8 text-emerald-600 animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={handleSaveProduct}
+                  disabled={isUploading}
+                  className="w-full py-4 lg:py-5 bg-slate-900 text-white rounded-xl lg:rounded-2xl font-bold text-[9px] lg:text-[10px] uppercase tracking-[0.3em] hover:bg-emerald-600 transition-all shadow-xl disabled:opacity-50"
+                >
+                  {isUploading ? 'Uploading...' : 'Save to Inventory'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
 
