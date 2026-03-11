@@ -956,7 +956,7 @@ export default function AdminPage() {
                 <div className="space-y-2 text-sm">
                   <p><span className="text-slate-400">Nama:</span> <span className="font-bold">{selectedOrder.customer_name}</span></p>
                   <p><span className="text-slate-400">No. WA:</span> <span className="font-bold">{selectedOrder.customer_phone}</span></p>
-                  <p><span className="text-slate-400">Alamat:</span> <span className="font-medium text-slate-600 italic">"{selectedOrder.address || 'Alamat tidak diisi'}"</span></p>
+                  <p><span className="text-slate-400">Alamat:</span> <span className="font-medium text-slate-600 italic">"{selectedOrder.customer_address || selectedOrder.address || 'Alamat tidak diisi'}"</span></p>
                 </div>
               </div>
 
