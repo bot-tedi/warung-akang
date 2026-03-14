@@ -8,12 +8,12 @@ import { useCartStore } from '@/store/cartStore';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
 import CartSidebar from '@/components/CartSidebar';
-import { 
-  ShoppingBag, 
-  Sparkles, 
-  Leaf, 
-  Carrot, 
-  Apple, 
+import {
+  ShoppingBag,
+  Sparkles,
+  Leaf,
+  Carrot,
+  Apple,
   Flame,
   ChevronRight,
   Search,
@@ -24,6 +24,11 @@ const CATEGORIES = [
   { id: 'all', name: 'Semua', icon: ShoppingBag },
   { id: 'sayuran', name: 'Sayuran', icon: Carrot },
   { id: 'buah', name: 'Buah', icon: Apple },
+  { id: 'cabe_cabean', name: 'Cabe Cabean', icon: Flame },
+  { id: 'rempah_rempah', name: 'Rempah-Rempah', icon: Flame },
+  { id: 'bawang_bawangan', name: 'Bawang-Bawangan', icon: ShoppingBag },
+  { id: 'biji_bijian', name: 'Biji-Bijian', icon: ShoppingBag },
+  { id: 'kerupuk', name: 'Kerupuk', icon: ShoppingBag },
   { id: 'bumbu', name: 'Bumbu', icon: Flame },
   { id: 'sembako', name: 'Sembako', icon: ShoppingBag },
   { id: 'lainnya', name: 'Lainnya', icon: Leaf },
@@ -32,7 +37,7 @@ const CATEGORIES = [
 // Simplified animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { 
+  visible: {
     opacity: 1,
     transition: { staggerChildren: 0.05 }
   }
@@ -50,7 +55,7 @@ export default function WarungSayurPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const { items, getTotalItems } = useCartStore();
-  
+
   const [mounted, setMounted] = useState(false);
 
   // Calculate total items directly for reactivity
@@ -111,10 +116,10 @@ export default function WarungSayurPage() {
                 </span>
               </h1>
               <p className="text-emerald-100/80 text-base sm:text-lg max-w-md mx-auto lg:mx-0 mb-8">
-                Belanja sayur dan kebutuhan dapur dengan kualitas terbaik. 
+                Belanja sayur dan kebutuhan dapur dengan kualitas terbaik.
                 Langsung dari petani ke dapur Anda.
               </p>
-              
+
               {/* Search Bar - Professional */}
               <div className="relative max-w-md mx-auto lg:mx-0">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -160,11 +165,10 @@ export default function WarungSayurPage() {
                 <button
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl whitespace-nowrap text-sm font-semibold transition-all flex-shrink-0 ${
-                    isActive
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl whitespace-nowrap text-sm font-semibold transition-all flex-shrink-0 ${isActive
                       ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {category.name}
@@ -229,8 +233,8 @@ export default function WarungSayurPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
             {filteredProducts.map((product, index) => (
-              <div 
-                key={product.id} 
+              <div
+                key={product.id}
                 className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-forwards"
                 style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
               >

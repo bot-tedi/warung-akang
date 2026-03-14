@@ -50,7 +50,7 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [formData, setFormData] = useState({
-    name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0
+    name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0, unit: 'kg'
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -289,6 +289,7 @@ export default function AdminPage() {
         description: formData.description,
         image_url: imageUrl,
         stock: parseInt(formData.stock) || 0,
+        unit: formData.unit,
       };
 
       // 3. Simpan langsung ke tabel 'products' menggunakan Supabase Client
@@ -306,11 +307,8 @@ export default function AdminPage() {
           .insert([productData]);
       }
 
-      if (result.error) throw result.error;
-
-      // 4. Reset form dan tutup modal
-      alert('Produk berhasil disimpan!');
-      setFormData({ name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0 });
+      // Reset form
+      setFormData({ name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0, unit: 'kg' });
       setImageFile(null);
       setImagePreview(null);
       setIsModalOpen(false);
@@ -897,6 +895,11 @@ export default function AdminPage() {
                     >
                       <option value="sayuran">Sayuran</option>
                       <option value="buah">Buah-Buahan</option>
+                      <option value="cabe_cabean">Cabe Cabean</option>
+                      <option value="rempah_rempah">Rempah-Rempah</option>
+                      <option value="bawang_bawangan">Bawang-Bawangan</option>
+                      <option value="biji_bijian">Biji-Bijian</option>
+                      <option value="kerupuk">Kerupuk</option>
                       <option value="bumbu">Bumbu Dapur</option>
                       <option value="sembako">Sembako</option>
                       <option value="lainnya">Lainnya</option>
@@ -923,6 +926,24 @@ export default function AdminPage() {
                     placeholder="0"
                     min="0"
                   />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Unit</label>
+                  <select
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
+                  >
+                    <option value="kg">Kilogram (kg)</option>
+                    <option value="ons">Ons</option>
+                    <option value="gram">Gram (g)</option>
+                    <option value="buah">Buah</option>
+                    <option value="ikat">Ikat</option>
+                    <option value="pack">Pack</option>
+                    <option value="botol">Botol</option>
+                    <option value="liter">Liter (L)</option>
+                    <option value="dos">Dos</option>
+                  </select>
                 </div>
               </div>
 

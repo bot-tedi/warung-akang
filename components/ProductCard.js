@@ -54,17 +54,17 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
         {/* Stock Indicator */}
         <div className="absolute top-5 right-5">
           <div className={`px-3 py-1.5 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-sm dark:shadow-lg flex items-center gap-1 ${product.stock <= 0
-              ? 'bg-red-500/90 text-white'
-              : product.stock <= 10
-                ? 'bg-amber-500/90 text-white'
-                : 'bg-emerald-500/90 text-white'
+            ? 'bg-red-500/90 text-white'
+            : product.stock <= 10
+              ? 'bg-amber-500/90 text-white'
+              : 'bg-emerald-500/90 text-white'
             }`}>
             {product.stock <= 0 ? (
               <><AlertTriangle className="w-3 h-3" /> Out of Stock</>
             ) : product.stock <= 10 ? (
-              <><Package className="w-3 h-3" /> {product.stock} left</>
+              <><Package className="w-3 h-3" /> {product.stock} {product.unit || 'pcs'}</>
             ) : (
-              <><Package className="w-3 h-3" /> {product.stock} pcs</>
+              <><Package className="w-3 h-3" /> {product.stock} {product.unit || 'pcs'}</>
             )}
           </div>
         </div>
@@ -85,12 +85,12 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
 
         <div className="flex items-center justify-between pt-6 border-t border-slate-50 dark:border-slate-700">
           <div className="flex flex-col">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-500">Price / Unit</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-500">Price / {product.unit || 'pcs'}</span>
             <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               {formatPrice(product.price)}
             </span>
             {product.stock <= 10 && product.stock > 0 && (
-              <span className="text-[8px] text-amber-500 font-medium mt-1">Only {product.stock} left</span>
+              <span className="text-[8px] text-amber-500 font-medium mt-1">Only {product.stock} {product.unit || 'pcs'} left</span>
             )}
           </div>
 
@@ -98,10 +98,10 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
             onClick={handleAddToCart}
             disabled={isAdding || product.stock <= 0}
             className={`relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg ${product.stock <= 0
-                ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed'
-                : isAdding
-                  ? 'bg-emerald-500 shadow-emerald-200 dark:shadow-emerald-600/30'
-                  : 'bg-slate-900 dark:bg-emerald-600 hover:bg-emerald-600 dark:hover:bg-emerald-700 shadow-slate-200 dark:shadow-emerald-600/20'
+              ? 'bg-slate-300 dark:bg-slate-600 cursor-not-allowed'
+              : isAdding
+                ? 'bg-emerald-500 shadow-emerald-200 dark:shadow-emerald-600/30'
+                : 'bg-slate-900 dark:bg-emerald-600 hover:bg-emerald-600 dark:hover:bg-emerald-700 shadow-slate-200 dark:shadow-emerald-600/20'
               }`}
           >
             {product.stock <= 0 ? (
