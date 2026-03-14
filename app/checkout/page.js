@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { useTheme } from 'next-themes';
-import { supabase, decreaseStock, checkProductAvailability } from '@/lib/supabase';
+import { supabase, supabaseAdmin, decreaseStock, checkProductAvailability } from '@/lib/supabase';
 import {
   ArrowLeft,
   Upload,
@@ -248,9 +248,6 @@ export default function CheckoutPage() {
         order_id: orderId,
       };
 
-      // Import supabase dynamically for client-side
-      const { supabaseAdmin } = await import('@/lib/supabase');
-
       // Try using admin client first (bypasses RLS)
       let insertResult;
       try {
@@ -262,7 +259,6 @@ export default function CheckoutPage() {
       } catch (adminError) {
         console.log('Admin client failed, trying regular client:', adminError);
         // Fallback to regular client
-        const { supabase } = await import('@/lib/supabase');
         insertResult = await supabase
           .from('orders')
           .insert([orderData])
@@ -273,8 +269,8 @@ export default function CheckoutPage() {
       const { data: savedOrder, error: insertError } = insertResult;
 
       if (insertError) {
-        console.error('Insert error:', insertError);
-        throw new Error(`Gagal menyimpan pesanan: ${insertError.message}`);
+        console.error('❌ Error saving order:', insertError);
+        throw new Error('Gagal menyimpan pesanan: ' + insertError.message);
       }
 
       // 3. Decrease stock after order is successfully saved
