@@ -9,8 +9,24 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
 
-  const isAsinan = variant === 'asinan' || product.type === 'asinan_sayur';
-  const themeColor = isAsinan ? 'emerald' : 'emerald'; // Konsisten profesional
+  // Get unit based on category
+  const getUnitByCategory = (category) => {
+    const unitMap = {
+      'sayuran': 'kg',
+      'buah': 'kg',
+      'cabe_cabean': 'kg',
+      'rempah_rempah': 'kg',
+      'bawang_bawangan': 'kg',
+      'biji_bijian': 'kg',
+      'kerupuk': 'pcs',
+      'bumbu': 'pcs',
+      'Daun': 'pcs',
+      'lainnya': 'pcs'
+    };
+    return unitMap[category] || 'pcs';
+  };
+
+  const displayUnit = product.unit || 'pcs';
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('id-ID', {
@@ -47,7 +63,7 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
         {/* Category Tag */}
         <div className="absolute top-5 left-5">
           <span className="px-4 py-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white shadow-sm dark:shadow-lg">
-            {isAsinan ? 'Signature' : 'Fresh Market'}
+            {product.category}
           </span>
         </div>
 
@@ -62,9 +78,9 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
             {product.stock <= 0 ? (
               <><AlertTriangle className="w-3 h-3" /> Out of Stock</>
             ) : product.stock <= 10 ? (
-              <><Package className="w-3 h-3" /> {product.stock} {product.unit || 'pcs'}</>
+              <><Package className="w-3 h-3" /> {product.stock} {displayUnit}</>
             ) : (
-              <><Package className="w-3 h-3" /> {product.stock} {product.unit || 'pcs'}</>
+              <><Package className="w-3 h-3" /> {product.stock} {displayUnit}</>
             )}
           </div>
         </div>
@@ -85,12 +101,12 @@ const ProductCard = memo(function ProductCard({ product, variant = 'default' }) 
 
         <div className="flex items-center justify-between pt-6 border-t border-slate-50 dark:border-slate-700">
           <div className="flex flex-col">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-500">Price / {product.unit || 'pcs'}</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-500">Price / {displayUnit}</span>
             <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               {formatPrice(product.price)}
             </span>
             {product.stock <= 10 && product.stock > 0 && (
-              <span className="text-[8px] text-amber-500 font-medium mt-1">Only {product.stock} {product.unit || 'pcs'} left</span>
+              <span className="text-[8px] text-amber-500 font-medium mt-1">Only {product.stock} {displayUnit} left</span>
             )}
           </div>
 

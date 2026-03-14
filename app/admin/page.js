@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getRealTimeStats, updateProductStock, increaseStock, decreaseStock } from '@/lib/supabase';
 import { fuzzyMatch } from '@/lib/utils';
+import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@/lib/categories';
 import {
   Search,
   LayoutDashboard,
@@ -31,7 +32,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MonthlyRevenueChart from '@/components/MonthlyRevenueChart';
 
 // --- Auth & Config (Tetap sesuai sistem Anda) ---
-const ADMIN_PASSWORD_HASH = 'W4rung@k4ng2024!S3cur3';
+const ADMIN_PASSWORD = 'W4rung@k4ng2024!S3cur3';
+
+// Get unit based on category for display
+const getUnitByCategory = (category) => {
+  const unitMap = {
+    'sayuran': 'kg',
+    'buah': 'kg',
+    'cabe_cabean': 'kg',
+    'rempah_rempah': 'kg',
+    'bawang_bawangan': 'kg',
+    'biji_bijian': 'kg',
+    'kerupuk': 'pcs',
+    'bumbu': 'pcs',
+    'Daun': 'pcs', // ubah dari kg ke pcs
+    'lainnya': 'pcs'
+  };
+  return unitMap[category] || 'pcs';
+};
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -296,16 +314,27 @@ export default function AdminPage() {
       let result;
       if (editingProduct) {
         // Update produk yang sudah ada
-        result = await supabase
+        const { data, error } = await supabase
           .from('products')
           .update(productData)
-          .eq('id', editingProduct.id);
+          .eq('id', editingProduct.id)
+          .select();
+
+        if (error) throw error;
+        result = data;
       } else {
         // Tambah produk baru
-        result = await supabase
+        const { data, error } = await supabase
           .from('products')
-          .insert([productData]);
+          .insert([productData])
+          .select();
+
+        if (error) throw error;
+        result = data;
       }
+
+      // Success feedback
+      alert(editingProduct ? 'Produk berhasil diperbarui!' : 'Produk berhasil ditambahkan!');
 
       // Reset form
       setFormData({ name: '', price: '', type: 'warung_sayur', category: 'sayuran', description: '', image_url: '', stock: 0, unit: 'kg' });
@@ -833,14 +862,14 @@ export default function AdminPage() {
                   </div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-sm lg:text-base text-slate-900 tracking-tight">{product.name}</h3>
-                    <span className="text-xs lg:text-sm font-black text-emerald-600">Rp {product.price.toLocaleString()}</span>
+                    <span className="text-xs lg:text-sm font-black text-emerald-600">Rp {product.price.toLocaleString()}/{product.unit || 'pcs'}</span>
                   </div>
                   <p className="text-[9px] lg:text-[10px] uppercase font-bold tracking-widest text-slate-300">{product.category}</p>
                   <div className="mt-2 lg:mt-3 flex items-center justify-between">
                     <div className="flex items-center gap-1 lg:gap-2">
                       <span className="text-[9px] lg:text-[10px] font-bold text-slate-400">Stock:</span>
                       <span className={`text-xs lg:text-sm font-bold ${product.stock <= 10 ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {product.stock} pcs
+                        {product.stock} {product.unit || 'pcs'}
                       </span>
                     </div>
                     <input
@@ -908,16 +937,9 @@ export default function AdminPage() {
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
                     >
-                      <option value="sayuran">Sayuran</option>
-                      <option value="buah">Buah-Buahan</option>
-                      <option value="cabe_cabean">Cabe Cabean</option>
-                      <option value="rempah_rempah">Rempah-Rempah</option>
-                      <option value="bawang_bawangan">Bawang-Bawangan</option>
-                      <option value="biji_bijian">Biji-Bijian</option>
-                      <option value="kerupuk">Kerupuk</option>
-                      <option value="bumbu">Bumbu Dapur</option>
-                      <option value="sembako">Sembako</option>
-                      <option value="lainnya">Lainnya</option>
+                      {PRODUCT_CATEGORIES.filter(cat => cat.id !== 'all').map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -949,15 +971,9 @@ export default function AdminPage() {
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                     className="w-full px-4 lg:px-5 py-3 bg-slate-50 rounded-xl outline-none appearance-none"
                   >
-                    <option value="kg">Kilogram (kg)</option>
-                    <option value="ons">Ons</option>
-                    <option value="gram">Gram (g)</option>
-                    <option value="buah">Buah</option>
-                    <option value="ikat">Ikat</option>
-                    <option value="pack">Pack</option>
-                    <option value="botol">Botol</option>
-                    <option value="liter">Liter (L)</option>
-                    <option value="dos">Dos</option>
+                    {PRODUCT_UNITS.map((unit) => (
+                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>

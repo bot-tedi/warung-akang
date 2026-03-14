@@ -8,6 +8,7 @@ import { useCartStore } from '@/store/cartStore';
 import Header from '@/components/Header';
 import ProductCard from '@/components/ProductCard';
 import CartSidebar from '@/components/CartSidebar';
+import { PRODUCT_CATEGORIES } from '@/lib/categories';
 import {
   ShoppingBag,
   Sparkles,
@@ -20,19 +21,6 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 
-const CATEGORIES = [
-  { id: 'all', name: 'Semua', icon: ShoppingBag },
-  { id: 'sayuran', name: 'Sayuran', icon: Carrot },
-  { id: 'buah', name: 'Buah', icon: Apple },
-  { id: 'cabe_cabean', name: 'Cabe Cabean', icon: Flame },
-  { id: 'rempah_rempah', name: 'Rempah-Rempah', icon: Flame },
-  { id: 'bawang_bawangan', name: 'Bawang-Bawangan', icon: ShoppingBag },
-  { id: 'biji_bijian', name: 'Biji-Bijian', icon: ShoppingBag },
-  { id: 'kerupuk', name: 'Kerupuk', icon: ShoppingBag },
-  { id: 'bumbu', name: 'Bumbu', icon: Flame },
-  { id: 'sembako', name: 'Sembako', icon: ShoppingBag },
-  { id: 'lainnya', name: 'Lainnya', icon: Leaf },
-];
 
 // Simplified animation variants
 const containerVariants = {
@@ -158,7 +146,7 @@ export default function WarungSayurPage() {
             <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
               <SlidersHorizontal className="w-5 h-5 text-gray-500" />
             </div>
-            {CATEGORIES.map((category) => {
+            {PRODUCT_CATEGORIES.map((category) => {
               const Icon = category.icon;
               const isActive = activeCategory === category.id;
               return (
@@ -166,8 +154,8 @@ export default function WarungSayurPage() {
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl whitespace-nowrap text-sm font-semibold transition-all flex-shrink-0 ${isActive
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -185,7 +173,7 @@ export default function WarungSayurPage() {
           <div>
             <span className="text-emerald-600 font-semibold text-sm tracking-wider uppercase">Produk</span>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
-              {CATEGORIES.find(c => c.id === activeCategory)?.name}
+              {PRODUCT_CATEGORIES.find(c => c.id === activeCategory)?.name}
             </h2>
             <p className="text-gray-500 text-sm sm:text-base mt-1">
               {filteredProducts.length} produk tersedia
