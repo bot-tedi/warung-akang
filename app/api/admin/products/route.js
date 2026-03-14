@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Hardcoded values to ensure connection works (same as lib/supabase.js)
+const supabaseUrl = 'https://qhqtewsbfqvxuxwtdiqb.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFocXRld3NiZnF2eHV4d3RkaXFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMzQxOTYsImV4cCI6MjA4ODcxMDE5Nn0.939Z8wXSHu1jCB0EgS6Xkdzhkok1bBv8SdwbcvF-1O8';
+
 // Create admin client with service role key (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Note: You should replace this with actual service role key from Supabase dashboard
+const serviceRoleKey = 'your-service-role-key-here'; // Ganti dengan service role key dari Supabase dashboard
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey || supabaseKey);
 
 const ADMIN_PASSWORD = 'W4rung@k4ng2024!S3cur3';
 

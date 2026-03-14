@@ -245,10 +245,7 @@ export default function CheckoutPage() {
         total_amount: getTotalPrice(),
         payment_proof_url: paymentUrl,
         status: 'pending_verification',
-<<<<<<< HEAD
         order_id: orderId,
-=======
->>>>>>> 20d3c94 (description)
       };
 
       // Import supabase dynamically for client-side

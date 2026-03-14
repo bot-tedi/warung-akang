@@ -313,7 +313,7 @@ export default function AdminPage() {
       setImagePreview(null);
       setIsModalOpen(false);
       setEditingProduct(null);
-      
+
       // Refresh data di halaman admin
       fetchInitialData();
     } catch (err) {
@@ -499,7 +499,7 @@ export default function AdminPage() {
         if (error) throw error;
 
         alert('Produk berhasil dihapus!');
-        
+
         // Refresh data agar daftar produk diperbarui
         await fetchInitialData();
       } catch (err) {
@@ -509,6 +509,21 @@ export default function AdminPage() {
         setLoading(true);
       }
     }
+  };
+
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      type: product.type,
+      category: product.category,
+      description: product.description || '',
+      image_url: product.image_url || '',
+      stock: product.stock,
+      unit: product.unit || 'kg'
+    });
+    setIsModalOpen(true);
   };
 
   const handleUpdateStock = async (productId, newStock) => {
@@ -812,7 +827,7 @@ export default function AdminPage() {
                   <div className="aspect-square rounded-xl lg:rounded-2xl overflow-hidden bg-slate-50 mb-4 lg:mb-6 relative">
                     <img src={product.image_url || '/placeholder.png'} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt={product.name} />
                     <div className="absolute top-2 lg:top-4 right-2 lg:right-4 flex gap-1 lg:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="bg-white p-1.5 lg:p-2 rounded-full shadow-lg text-slate-600 hover:text-emerald-600"><Edit3 className="w-3 h-3 lg:w-4 lg:h-4" /></button>
+                      <button onClick={() => handleEditProduct(product)} className="bg-white p-1.5 lg:p-2 rounded-full shadow-lg text-slate-600 hover:text-emerald-600"><Edit3 className="w-3 h-3 lg:w-4 lg:h-4" /></button>
                       <button onClick={() => handleDeleteProduct(product.id)} className="bg-white p-1.5 lg:p-2 rounded-full shadow-lg text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3 lg:w-4 lg:h-4" /></button>
                     </div>
                   </div>
@@ -848,7 +863,7 @@ export default function AdminPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-6 lg:p-12 relative shadow-2xl">
             <button onClick={() => setIsModalOpen(false)} className="absolute top-4 lg:top-8 right-4 lg:right-8 text-slate-400 hover:text-slate-900"><XCircle className="w-6 h-6 lg:w-8 lg:h-8" /></button>
-            <h2 className="text-2xl lg:text-3xl font-light mb-6 lg:mb-8 italic font-serif">Add New Product</h2>
+            <h2 className="text-2xl lg:text-3xl font-light mb-6 lg:mb-8 italic font-serif">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
               <div className="space-y-4 lg:space-y-6">
@@ -981,7 +996,7 @@ export default function AdminPage() {
                   disabled={isUploading}
                   className="w-full py-4 lg:py-5 bg-slate-900 text-white rounded-xl lg:rounded-2xl font-bold text-[9px] lg:text-[10px] uppercase tracking-[0.3em] hover:bg-emerald-600 transition-all shadow-xl disabled:opacity-50"
                 >
-                  {isUploading ? 'Uploading...' : 'Save to Inventory'}
+                  {isUploading ? 'Uploading...' : (editingProduct ? 'Update Product' : 'Save to Inventory')}
                 </button>
               </div>
             </div>
