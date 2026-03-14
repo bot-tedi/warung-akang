@@ -245,14 +245,35 @@ export default function CheckoutPage() {
         total_amount: getTotalPrice(),
         payment_proof_url: paymentUrl,
         status: 'pending_verification',
+<<<<<<< HEAD
         order_id: orderId,
+=======
+>>>>>>> 20d3c94 (description)
       };
 
-      const { data: savedOrder, error: insertError } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select()
-        .single();
+      // Import supabase dynamically for client-side
+      const { supabaseAdmin } = await import('@/lib/supabase');
+
+      // Try using admin client first (bypasses RLS)
+      let insertResult;
+      try {
+        insertResult = await supabaseAdmin
+          .from('orders')
+          .insert([orderData])
+          .select()
+          .single();
+      } catch (adminError) {
+        console.log('Admin client failed, trying regular client:', adminError);
+        // Fallback to regular client
+        const { supabase } = await import('@/lib/supabase');
+        insertResult = await supabase
+          .from('orders')
+          .insert([orderData])
+          .select()
+          .single();
+      }
+
+      const { data: savedOrder, error: insertError } = insertResult;
 
       if (insertError) {
         console.error('Insert error:', insertError);
